@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Medidosis: compatibilidad de fármacos intravenosos administrados en Y.">
+<title>Medidosis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: barra superior con dos pestañas centradas (Consulta rápida, Fármacos); resultado de compatibilidad bajo los fármacos; fuentes en el pie.
+   Aspecto único, pedido por el usuario: fondo blanco y texto verde (sin variante oscura). */
+:root{
+  --bg:#ffffff;
+  --ink:#0f4a2a;        /* verde texto principal */
+  --ink-soft:#3f7356;   /* verde texto secundario */
+  --accent:#16803c;     /* verde de acción */
+  --tint:#eef7f1;       /* verde muy claro para superficies */
+  --line:#cfe4d6;       /* bordes */
+  --ok:#15803d; --ok-bg:#dcf3e3;
+  --warn:#9a5b00; --warn-bg:#fdf1d8;
+  --bad:#b42318; --bad-bg:#fde7e4;
+  --nd:#55606b; --nd-bg:#eceff1;
+  --f-body:"Atkinson Hyperlegible", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r:10px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-body);font-size:16px;line-height:1.45;padding-inline:16px;padding-block:0 48px}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3{text-wrap:balance;margin:0;line-height:1.2}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.num,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* Cabecera */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:2px solid var(--ink);margin-inline:-16px;padding-inline:16px}
+.toprow{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;padding-block:12px 0}
+.brand{display:flex;align-items:baseline;gap:10px;padding-bottom:4px}
+.brand b{font-size:1.55rem;letter-spacing:-.01em}
+.brand .drop{width:14px;height:18px;align-self:center}
+.brand small{color:var(--ink-soft);font-size:.82rem;letter-spacing:.06em;text-transform:uppercase}
+nav.tabs{display:flex;justify-content:center;gap:6px;overflow-x:auto;max-width:100%}
+nav.tabs button{background:none;border:0;border-bottom:5px solid transparent;padding:14px 26px 12px;cursor:pointer;color:var(--ink-soft);font-weight:700;white-space:nowrap;font-size:calc(1rem + 3px)}
+@media (max-width:480px){nav.tabs{gap:0}nav.tabs button{padding:12px 12px 10px}}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs button:hover{color:var(--ink)}
+.badge-count{display:inline-block;min-width:1.4em;padding:0 .35em;margin-left:4px;border-radius:999px;background:var(--bad);color:#fff;font-size:.75rem;line-height:1.4em;text-align:center}
+
+main section.view{padding-top:20px}
+.pagehead{display:flex;gap:12px 20px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+.pagehead h1{font-size:1.9rem}
+.pagehead p{margin:.25rem 0 0;color:var(--ink-soft);max-width:65ch}
+.notice{border:1px solid var(--line);background:var(--tint);border-radius:var(--r);padding:10px 14px;font-size:.92rem;color:var(--ink-soft);margin-bottom:16px}
+.notice strong{color:var(--ink)}
+
+/* Botones */
+.btn{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;min-height:42px}
+.btn.ghost{background:var(--bg);color:var(--accent)}
+.btn.small{padding:4px 10px;min-height:34px;font-size:.9rem}
+.btn.danger{border-color:var(--bad);color:var(--bad);background:var(--bg)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.iconbtn{border:1px solid var(--line);background:var(--bg);border-radius:8px;width:34px;height:34px;display:inline-grid;place-items:center;cursor:pointer;color:var(--ink-soft);flex:none}
+.iconbtn:hover{color:var(--bad);border-color:var(--bad)}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+.toolbar .spacer{flex:1}
+
+/* Resumen paciente */
+.ptstrip{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:16px;font-size:.95rem}
+.ptstrip .lab{color:var(--ink-soft);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-weight:700;cursor:pointer;text-decoration:underline}
+
+/* Catéteres */
+.cath{border:2px solid var(--ink);border-radius:14px;margin-bottom:18px;overflow:hidden}
+.cath-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;background:var(--tint);border-bottom:1px solid var(--line)}
+.cath-head input.cname{font-weight:700;font-size:1.1rem;border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;min-width:0;flex:1 1 160px}
+.cath-head input.cname:hover,.cath-head input.cname:focus{border-color:var(--line);background:var(--bg)}
+.cath-head select{border:1px solid var(--line);border-radius:6px;padding:5px 6px;background:var(--bg)}
+.lumens{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0}
+.lumen{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.lumen-head{display:flex;align-items:center;gap:8px}
+.lumen-head input{font-weight:700;border:1px solid transparent;background:transparent;border-radius:6px;padding:3px 5px;width:auto;flex:1 1 4em;min-width:0}
+.lumen-head input:hover,.lumen-head input:focus{border-color:var(--line)}
+.lumen-head .grow{flex:1}
+.lumen-warn{font-size:.85rem;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:6px 8px}
+.empty-lumen{color:var(--ink-soft);font-size:.9rem;border:1px dashed var(--line);border-radius:8px;padding:12px;text-align:center}
+
+/* Pastillas de estado */
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 10px;font-size:.82rem;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.pill::before{font-family:var(--f-mono);font-weight:600}
+.st-C{background:var(--ok-bg);color:var(--ok);border-color:#a7dcb7}.st-C::before{content:"✓"}
+.st-COND{background:var(--warn-bg);color:var(--warn);border-color:#f0cf8c}.st-COND::before{content:"!"}
+.st-I{background:var(--bad-bg);color:var(--bad);border-color:#f3b0a8}.st-I::before{content:"✕"}
+.st-ND{background:var(--nd-bg);color:var(--nd);border-color:#cfd5da}.st-ND::before{content:"?"}
+.st-NONE{background:var(--tint);color:var(--ink-soft);border-color:var(--line)}
+
+/* Tarjeta de medicación */
+.item{border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.item.sev-I{border-left:5px solid var(--bad)}.item.sev-COND{border-left:5px solid #e0a43a}.item.sev-ND{border-left:5px solid #9aa5ae}.item.sev-C{border-left:5px solid var(--ok)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row > *{min-width:0}
+.fld{display:flex;flex-direction:column;gap:2px;font-size:.78rem;color:var(--ink-soft);letter-spacing:.02em}
+.fld input,.fld select{font-size:.95rem;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--bg);min-height:38px}
+.fld input{width:6.2em}
+.fld.w-wide input{width:100%}
+.fld select{max-width:100%}
+.seg{display:inline-flex;border:1px solid var(--accent);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;background:var(--bg);color:var(--accent);padding:5px 10px;font-weight:700;font-size:.85rem;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.out{font-family:var(--f-mono);font-size:.84rem;background:var(--tint);border-radius:6px;padding:6px 8px;color:var(--ink);line-height:1.5;overflow-wrap:anywhere}
+.out:empty{display:none}
+.pairs{display:flex;flex-direction:column;gap:6px}
+.pairline{font-size:.88rem;display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap}
+.pairline .why{flex:1 1 220px;color:var(--ink-soft);min-width:0}
+.pairline .src{display:block;font-size:.75rem;color:var(--ink-soft);opacity:.85}
+.alerts{display:flex;flex-direction:column;gap:4px}
+.alert{font-size:.85rem;border-radius:6px;padding:6px 8px;background:var(--warn-bg);color:#6b3f00}
+.alert.bad{background:var(--bad-bg);color:#8a1a12}
+.alert .src{display:block;font-size:.72rem;opacity:.85}
+
+/* Selector de fármaco */
+.combo{position:relative;flex:1 1 100%;min-width:0}
+.combo input{width:100%;font-weight:700;font-size:1.08rem;border:1px solid var(--ink-soft);border-radius:8px;padding:9px 10px;min-height:46px}
+.combo ul{position:absolute;z-index:40;left:0;top:100%;width:max(100%, min(460px, calc(100vw - 32px)));margin:4px 0 0;padding:6px;list-style:none;background:var(--bg);border:2px solid var(--ink);border-radius:10px;max-height:min(420px,60vh);overflow:auto;box-shadow:0 12px 32px rgba(15,74,42,.22)}
+.combo li{padding:11px 12px;border-radius:7px;cursor:pointer;display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:1.05rem;line-height:1.3}
+.combo li + li{border-top:1px solid var(--tint)}
+.combo li span.alias{display:block;font-size:.8rem;color:var(--ink-soft);font-weight:400}
+.combo li small{color:var(--ink-soft);white-space:nowrap;font-size:.78rem}
+.combo li[aria-selected="true"],.combo li:hover{background:var(--tint)}
+
+/* Propuesta de distribución */
+.plan{border:2px dashed var(--accent);border-radius:14px;padding:14px;margin-bottom:18px}
+.plan h2{font-size:1.15rem;margin-bottom:6px}
+.plan ol{margin:8px 0;padding-left:1.4em}
+.plan li{margin:4px 0}
+
+/* Constantes */
+.vitals{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.vital{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.vital label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft)}
+.vital .vin{display:flex;gap:6px;align-items:center}
+.vital input{width:100%;min-width:0;font-family:var(--f-mono);font-size:1.15rem;border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.vital select{border:1px solid var(--line);border-radius:6px;padding:6px 4px;background:var(--bg)}
+.vital .unit{font-size:.85rem;color:var(--ink-soft);white-space:nowrap}
+.vital .flag{font-size:.8rem;font-weight:700}
+.vital.flag-bad{border-color:var(--bad)}.vital.flag-bad .flag{color:var(--bad)}
+.vital.flag-warn{border-color:#e0a43a}.vital.flag-warn .flag{color:var(--warn)}
+
+/* Consulta rápida */
+.quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-bottom:16px}
+.qslot{border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px}
+.qslot .lab{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft)}
+.verdict{border-radius:14px;padding:16px;margin-bottom:14px;border:2px solid}
+.verdict h2{font-size:1.4rem}
+.verdict.v-C{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
+.verdict.v-COND{border-color:#e0a43a;background:var(--warn-bg);color:var(--warn)}
+.verdict.v-I{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+.verdict.v-ND{border-color:#9aa5ae;background:var(--nd-bg);color:var(--nd)}
+.verdict p{margin:.3rem 0 0;color:var(--ink)}
+table.pairs-t{border-collapse:collapse;width:100%;font-size:.92rem}
+.tscroll{overflow-x:auto}
+table.pairs-t th,table.pairs-t td{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
+table.pairs-t th{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft)}
+
+/* Fármacos */
+.druglayout{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:18px}
+@media (max-width:760px){.druglayout{grid-template-columns:1fr}}
+.druglist{border:1px solid var(--line);border-radius:var(--r);max-height:70vh;overflow:auto}
+.druglist input{position:sticky;top:0;width:100%;border:0;border-bottom:1px solid var(--line);padding:10px;background:var(--bg)}
+.druglist button{display:flex;justify-content:space-between;width:100%;text-align:left;border:0;border-bottom:1px solid var(--tint);background:var(--bg);padding:8px 10px;cursor:pointer;gap:8px}
+.druglist button[aria-current="true"]{background:var(--tint);font-weight:700}
+.druglist button small{color:var(--ink-soft)}
+.mono-card{border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.mono-card h2{font-size:1.5rem;margin-bottom:4px}
+.dl{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:6px 14px;margin:12px 0}
+.dl dt{color:var(--ink-soft);font-size:.85rem}
+.dl dd{margin:0}
+@media (max-width:520px){.dl{grid-template-columns:1fr}.dl dt{margin-top:6px}}
+.partners{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}
+.tag{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:14px 0 4px;font-weight:700}
+
+/* Fuentes */
+.prose{max-width:72ch}
+.prose h2{font-size:1.25rem;margin:22px 0 6px}
+.prose p,.prose li{color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+
+.patientbar{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;border:2px solid var(--ink);border-radius:14px;padding:12px 14px;margin-bottom:14px;background:var(--tint)}
+.patientbar .lab{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:700}
+.patientbar select{font-size:1.05rem;font-weight:700;border:1px solid var(--ink-soft);border-radius:8px;padding:8px 10px;background:var(--bg);min-height:44px;max-width:100%;min-width:0;flex:1 1 220px}
+.patientbar .save{font-size:.85rem;color:var(--ink-soft);margin-left:auto}
+.ptform{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;width:100%}
+.ptform .fld input{width:14em}
+.redwarn{border:2px solid var(--bad);background:var(--bad-bg);color:var(--bad);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.redwarn strong{font-size:1rem}
+.redwarn p{margin:0;color:#8a1a12;font-weight:700}
+.redwarn .row .btn{border-color:var(--bad)}
+.redwarn .btn.solid{background:var(--bad);color:#fff}
+.redwarn .btn.ghost{color:var(--bad)}
+.redline{font-size:.85rem;color:var(--bad);border-left:4px solid var(--bad);padding:2px 8px;font-weight:700}
+.pairline.bad .why{color:var(--bad)}
+.item.flash{outline:3px solid var(--bad);outline-offset:2px}
+.dilrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.dilrow select,.dilrow input{font-size:.95rem;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--bg);min-height:38px}
+.dilrow input{width:4.5em}
+.confirm{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.92rem;border:1px solid var(--bad);border-radius:8px;padding:6px 8px;color:var(--bad)}
+/* Inicio: lista de pacientes */
+.addpt{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:2px dashed var(--accent);background:var(--tint);color:var(--accent);border-radius:14px;padding:18px;font-size:1.15rem;font-weight:700;cursor:pointer;margin-bottom:18px}
+.addpt:hover{background:var(--ok-bg)}
+.newpt{border:2px solid var(--accent);border-radius:14px;padding:16px;margin-bottom:18px;display:flex;flex-direction:column;gap:12px}
+.newpt h2{font-size:1.2rem}
+.newpt .fld input{width:16em;max-width:100%;font-size:1.05rem;min-height:44px}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.pcard{display:flex;flex-direction:column;gap:8px;text-align:left;border:2px solid var(--ink);border-radius:14px;padding:14px 16px;background:var(--bg);cursor:pointer;color:var(--ink);min-width:0}
+.pcard:hover{background:var(--tint)}
+.pcard.example{border-style:dashed;border-color:var(--ink-soft)}
+.pcard .ptop{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.pcard .pname{font-size:1.3rem;font-weight:700;overflow-wrap:anywhere}
+.pcard .meta{font-size:.9rem;color:var(--ink-soft)}
+.pcard .vit{font-family:var(--f-mono);font-size:.84rem;color:var(--ink);font-variant-numeric:tabular-nums}
+.pcard .go{color:var(--accent);font-weight:700;font-size:.95rem;margin-top:2px}
+.savestat{font-size:.85rem;color:var(--ink-soft)}
+.hint{color:var(--ink-soft);font-size:.95rem;margin:14px 0 0}
+/* Ficha de paciente */
+.backbtn{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;padding:6px 0;font-size:1rem}
+.pthead{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:4px 0 8px}
+.pthead h1{font-size:1.9rem;overflow-wrap:anywhere}
+.pthead .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.subtabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin:6px 0 16px;overflow-x:auto}
+.subtabs button{background:none;border:0;border-bottom:4px solid transparent;margin-bottom:-2px;padding:10px 16px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;font-size:1.05rem}
+.subtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+/* Medicación plegada */
+.item-sum{display:flex;gap:8px;align-items:center}
+.item-sum .dname{font-weight:700;font-size:1.08rem;flex:1 1 8em;min-width:0;overflow-wrap:anywhere}
+.item .dmeta{font-size:.86rem;color:var(--ink-soft);font-family:var(--f-mono);overflow-wrap:anywhere;flex:1 1 12em;min-width:0}
+.item.collapsed{gap:6px}
+/* Constantes en consulta rápida */
+details.qvit{border:1px solid var(--line);border-radius:var(--r);margin-bottom:16px}
+details.qvit summary{cursor:pointer;padding:12px 14px;font-weight:700;color:var(--accent);list-style-position:inside}
+details.qvit summary span{color:var(--ink-soft);font-weight:400}
+details.qvit[open] summary{border-bottom:1px solid var(--line)}
+details.qvit .inner{padding:12px 14px}
+details.qvit .vitals{margin-bottom:6px}
+/* Pie */
+footer.foot{max-width:1180px;margin:48px auto 0;border-top:1px solid var(--line);padding-top:14px;display:flex;gap:6px 20px;flex-wrap:wrap;align-items:center;font-size:.88rem;color:var(--ink-soft)}
+footer.foot .linkbtn{font-weight:400;color:var(--ink-soft)}
+footer.foot .linkbtn:hover{color:var(--accent)}
+@media (max-width:420px){.lumens{grid-template-columns:1fr}.fld input{width:5.4em}.pthead h1{font-size:1.5rem}}
+@media (prefers-reduced-motion:no-preference){.item{transition:border-color .2s}}
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="toprow">
+    <div class="brand">
+      <svg class="drop" viewBox="0 0 14 18" aria-hidden="true"><path d="M7 1 C7 1 1 8 1 11.5 A6 6 0 0 0 13 11.5 C13 8 7 1 7 1Z" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      <b>Medidosis</b><small>Compatibilidad IV en Y</small>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Secciones">
+      <button role="tab" id="tab-rapida" data-view="rapida" aria-selected="true">Consulta rápida</button>
+      <button role="tab" id="tab-farmacos" data-view="farmacos" aria-selected="false">Fármacos</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- CONSULTA RÁPIDA -->
+  <section class="view" id="view-rapida">
+    <div class="pagehead"><div><h1>Consulta rápida</h1><p>Elija de 2 a 4 fármacos para saber si pueden ir por la misma luz del catéter. Indicar el diluyente y la concentración es opcional, pero afina el resultado.</p></div></div>
+    <div class="quick" id="quick"></div>
+    <details class="qvit" id="qvitBox">
+      <summary>Añadir constantes para esta consulta <span>(opcional)</span></summary>
+      <div class="inner"><p style="margin:0 0 10px;color:var(--ink-soft)">Si las indica, el resultado incluirá avisos según la situación del paciente. No se guardan en ningún sitio.</p><div class="vitals" id="qvitals"></div></div>
+    </details>
+    <div id="quickOut"></div>
+  </section>
+
+  <!-- FÁRMACOS -->
+  <section class="view" id="view-farmacos" hidden>
+    <div class="pagehead"><div><h1>Fármacos</h1><p>Ficha de cada fármaco con lo que dicen las fuentes: diluyentes, velocidad, estabilidad y con qué es compatible en Y.</p></div></div>
+    <div class="druglayout">
+      <div class="druglist" id="druglist"><input id="drugSearch" type="search" placeholder="Buscar fármaco…" aria-label="Buscar fármaco"><div id="druglistItems"></div></div>
+      <div class="mono-card" id="mono"></div>
+    </div>
+  </section>
+
+  <!-- FUENTES (enlace del pie) -->
+  <section class="view prose" id="view-fuentes" hidden>
+    <button class="backbtn" type="button" id="backFromFuentes">← Volver</button>
+    <div class="pagehead"><div><h1>Fuentes, criterios y privacidad</h1></div></div>
+    <h2>Herramienta de apoyo</h2>
+    <p>Medidosis ayuda a decidir qué medicación puede ir por la misma luz, pero no sustituye el juicio clínico ni la consulta con Farmacia. Una combinación sin datos no significa que sea compatible. Confirme con Farmacia o con Micromedex/Trissel antes de administrar, sobre todo en pacientes críticos.</p>
+    <p>Cuando dos fármacos son incompatibles o solo compatibles en ciertas condiciones, la app muestra un aviso en rojo y recomienda revisar las dosis y concentraciones estándar de su unidad.</p>
+    <h2>Avisos por constantes</h2>
+    <p>Los avisos por constantes son reglas generales de farmacología clínica (efectos hemodinámicos, respiratorios, metabólicos y eliminación renal). No proceden de las guías de compatibilidad y no sustituyen la valoración médica. Para ajustes de dosis según función renal o hepática consulte Lexicomp/UpToDate o la ficha técnica (CIMA/Botplus). El filtrado glomerular se estima con la fórmula de Cockcroft-Gault si no se introduce un valor medido.</p>
+    <h2>Diluyentes</h2>
+    <p>Los estudios de compatibilidad indican el diluyente usado. Cuando una pareja solo es compatible en glucosado 5% o en suero fisiológico 0,9%, la app solo da la condición por cumplida con ese diluyente y esa concentración exactos. Con otro porcentaje (por ejemplo glucosado 10% o suero 0,45%) el resultado queda como condicional porque no hay datos.</p>
+    <h2>Qué datos contiene esta versión</h2>
+    <p>Todos los resultados de compatibilidad salen de tres fuentes publicadas y elaboradas por farmacéuticos hospitalarios: los dos documentos de referencia del proyecto y un artículo revisado por pares cuyos datos proceden de Micromedex. Cada resultado indica de cuál procede.</p>
+    <ol>
+      <li><strong>Castells Lao G, Rodríguez Reyes M, Roura Turet J, Prat Dot M, Soy Muner D, López Cabezas C.</strong> Compatibilidad de los fármacos administrados en «Y» en las unidades de cuidados intensivos: revisión sistemática. <em>Med Intensiva.</em> 2020;44(2):80-87. doi:10.1016/j.medin.2018.08.004. Hospital Clínic de Barcelona. Revisión de Medline, Stabilis, <em>Handbook on Injectable Drugs</em> (Trissel) y Micromedex. 44 fármacos de UCI, 945 parejas: 366 compatibles, 80 incompatibles, 29 compatibles en condiciones especiales y 470 sin datos. En la app se citan como <em>Med Intensiva 2020</em>.</li>
+      <li><strong>Marsilio NR, da Silva D, Bueno D.</strong> Incompatibilidades medicamentosas en una UCI de adultos de un hospital universitario. <em>Rev Bras Ter Intensiva.</em> 2016;28(2):147-53. Hospital de Clínicas de Porto Alegre (Servicio de Farmacia) y Facultad de Farmacia de la UFRGS. Las incompatibilidades se clasificaron con <strong>Micromedex (DrugDex)</strong>. De su tabla 2 se han añadido 16 parejas incompatibles (hidrocortisona, cefepime, vancomicina, omeprazol, fenitoína, cotrimoxazol, entre otras). En la app se citan como <em>Micromedex, en Marsilio et al. 2016</em>.</li>
+      <li><strong>Espinosa Franco B, Hernández Galindo MT, García Casas M.</strong> Guía de compatibilidades de fármacos en vía parenteral para un hospital de segundo nivel. UNAM, FES Zaragoza, Farmacia Clínica (PAPIME-PE202409), 2010. Basada en Trissel 14.ª ed., Gahart, AHFS, Lexi-Comp y Micromedex. Aporta diluyentes, velocidades de infusión, estabilidad y listas de fármacos compatibles en Y. En la app se cita como <em>Guía UNAM 2010</em>.</li>
+    </ol>
+    <h2>Cómo se decide el resultado</h2>
+    <div class="legend"><span class="pill st-C">Compatible</span><span class="pill st-COND">Condicional</span><span class="pill st-I">Incompatible</span><span class="pill st-ND">Sin datos</span></div>
+    <ul>
+      <li><strong>Incompatible</strong> si cualquiera de las fuentes lo indica, o si la Guía UNAM dice «No mezclar» para uno de los dos fármacos (clonixinato de lisina, diclofenaco, dicloxacilina, enoxaparina, metamizol y omeprazol).</li>
+      <li><strong>Condicional</strong> cuando la compatibilidad depende del diluyente (solo en glucosado 5% o solo en suero fisiológico) o de no superar una concentración máxima (tabla 2 del artículo). Si se indican el diluyente y la concentración, la app comprueba la condición y la da por cumplida o no.</li>
+      <li>Si las fuentes discrepan, prevalece la más restrictiva y se muestran ambas.</li>
+      <li>Los datos del artículo se estudiaron a las concentraciones estándar de su tabla 1. Si la concentración introducida es mayor, el resultado pasa a condicional: según los autores, no se puede extrapolar.</li>
+      <li>Los estudios analizan parejas de fármacos. Con tres o más fármacos en una luz se comprueban todas las parejas, pero los autores desaconsejan juntar más de dos.</li>
+      <li><strong>Sin datos</strong>: ninguna de las dos fuentes estudió esa pareja. Trátela como no compatible hasta confirmarlo.</li>
+    </ul>
+    <h2>Fuentes revisadas que no se han podido incorporar</h2>
+    <p>Se buscaron más datos en fuentes profesionales. No se han añadido porque sus tablas son imágenes o rejillas que no se pueden leer de forma fiable sin riesgo de copiar mal una casilla:</p>
+    <ul>
+      <li>Stabilis 4.0 (base de datos de farmacéuticos hospitalarios): su tabla de compatibilidades en Y se construye de forma interactiva y se recomienda consultarla directamente en stabilis.org.</li>
+      <li>Y-site Compatibility Chart for Critical Care, Vancouver Coastal Health (revisión agosto 2025).</li>
+      <li>Santos GP et al. Guía de incompatibilidad en Y, Hospital Universitário de Lagarto. <em>Res Soc Dev.</em> 2023 (basada en Trissel).</li>
+      <li>Madrigal-Cadavid J, Amariles P. Incompatibilidad de medicamentos intravenosos: revisión estructurada. <em>CES Medicina.</em> 2017.</li>
+    </ul>
+    <p>Si su hospital dispone de una tabla de compatibilidades en texto o en hoja de cálculo, se puede incorporar con la misma metodología.</p>
+    <h2>Fuentes de verificación recomendadas</h2>
+    <p>Esta app no tiene acceso a bases de datos de suscripción. Para combinaciones sin datos, concentraciones distintas o pacientes con fallo renal o hepático, consulte:</p>
+    <ul>
+      <li>Micromedex IV Compatibility / Trissel's 2 ClinicalView y <em>Handbook on Injectable Drugs</em> (ASHP).</li>
+      <li><em>King Guide to Parenteral Admixtures</em>.</li>
+      <li>Lexicomp / UpToDate para interacciones y ajustes de dosis según función renal y hepática.</li>
+      <li>CIMA (AEMPS) o Botplus para la ficha técnica autorizada en España, excipientes y vías aprobadas.</li>
+      <li>Stabilis (base pública de estabilidad y compatibilidad).</li>
+      <li>La guía de administración IV de su hospital o del Servicio de Farmacia.</li>
+    </ul>
+    <h2 id="privacidad">Privacidad</h2>
+    <p>Medidosis no tiene cuentas ni inicio de sesión y no guarda ningún dato. Lo que escribe en la consulta rápida (fármacos, concentraciones y constantes) solo existe mientras la página está abierta y desaparece al recargarla o cerrarla. No se envía a ningún servidor.</p>
+    <p>No hace falta introducir datos que identifiquen al paciente.</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>Medidosis</span>
+  <button class="linkbtn" type="button" data-goto="fuentes">Fuentes y criterios</button>
+  <button class="linkbtn" type="button" data-goto="privacidad">Privacidad</button>
+</footer>
+
+<script>
+const DATA = {"drugs":{"Aciclovir":{},"Adrenalina":{"icu":1,"ref":[0.04,"mg/mL"]},"Albúmina":{"u":{"dil":"Dx 5%, SF 0,9%","rate":"Al 5%: no más de 5 mL/min. Al 20%: no más de 2 mL/min. Al 25%: no más de 3 mL/min.","stab":"Almacenar en refrigeración. Usar dentro de las 4 horas después de abierto. Desechar lo que no se use.","mix":"NO"}},"Alopurinol":{},"Amikacina":{"u":{"dil":"Dx 5%, 10%, SF 0,9%","rate":"Adultos: 500 mg/100-200 mL en 30-60 min. Niños: 1-2 h.","stab":"Soluciones de 0,25 mg/mL y 5 mg/mL son estables 24 h a temperatura ambiente.","mix":["Amiodarona","Ceftazidima","Dexametasona","Fluconazol","Furosemida","Gatifloxacino","Levofloxacino","Lorazepam","Midazolam","Ondansetrón","Warfarina"]}},"Aminofilina":{"u":{"dil":"Dx 5%, 10%, SF 0,9%","rate":"4 mg/mL, 20 mg/min. No más de 7,5 mg/kg en más de 30 min. 250 mg/8 h.","stab":"12,5 mg/50 mL en agua y Dx: estable 24 h a 24-26 °C.","mix":["Amobarbital","Cimetidina","Dexametasona","Difenhidramina","Dopamina","Furosemida","Heparina sódica","Hidrocortisona","Meropenem","Potasio cloruro","Fenobarbital","Ranitidina"]}},"Amiodarona":{"icu":1,"ref":[3.6,"mg/mL"],"u":{"dil":"Dx 5%","rate":"Carga rápida: 15 mg/min durante 10 min; después 1 mg/min durante 6 h; mantenimiento 0,5 mg/min. No exceder la velocidad recomendada.","stab":"Soluciones de 0,6 mg/mL estables 5 días a temperatura ambiente.","mix":["Dobutamina","Lidocaína","Potasio cloruro","Verapamilo"]}},"Amobarbital":{},"Ampicilina":{},"Anfotericina B":{},"Argatroban":{"icu":1,"ref":[1,"mg/mL"]},"Bicarbonato sódico":{"icu":1,"ref":[null,"1 mmol/l (según tabla 1)"]},"Buprenorfina":{"u":{"dil":"Dx 5%, SF 0,9%, Hartmann","rate":"IV directa en no menos de 2 min.","stab":"Estable a temperatura ambiente; proteger de la luz.","mix":["Haloperidol","Flucloxacilina","Midazolam"]}},"Butilhioscina":{"u":{"dil":"Dx 5%, 10%, SF 0,9%, agua","rate":"IV directa 4 mg/min.","stab":"Solución abierta estable 24 h a temperatura ambiente; proteger de la luz.","mix":["Heparina sódica","Hidrocortisona","Potasio cloruro"]}},"Calcio cloruro":{"icu":1,"ref":[10,"mg/mL"]},"Calcio gluconato":{"icu":1,"ref":[10,"mg/mL"]},"Cefazolina":{},"Cefepime":{"u":{"dil":"Dx 5%, 10%, SF 0,9%","rate":"100 mg/mL en 30 min; 50-100 mL en 30 min.","stab":"Reconstituida: estable 24 h a temperatura ambiente y 7 días en refrigeración.","mix":["Dexametasona","Fluconazol","Furosemida","Hidrocortisona","Imipenem","Lorazepam","Metilprednisolona","Metronidazol","Ranitidina","Trimetoprim-sulfametoxazol"]}},"Cefotaxima":{"u":{"dil":"Dx 5%, SF 0,9%","rate":"50-100 mL en 20-30 min.","stab":"Reconstituida: estable 24 h a temperatura ambiente o 5 días en refrigeración.","mix":["Diltiazem","Lorazepam","Levofloxacino","Meperidina","Midazolam","Ondansetrón"]}},"Ceftazidima":{"icu":1,"ref":[24,"mg/mL"],"u":{"dil":"Dx 5%, SF 0,9%","rate":"Aplicar la solución en 15-30 min; 50-100 mL en 30 min.","stab":"Reconstituida >100 mg/mL: estable 18 h a temperatura ambiente o 3 días en refrigeración.","mix":["Amikacina","Aminofilina","Alopurinol","Ciprofloxacino","Diltiazem","Furosemida","Heparina sódica","Gatifloxacino","Ondansetrón","Ranitidina","Teofilina"]}},"Ceftriaxona":{"u":{"dil":"Dx 5%, 10%, SF 0,9%","rate":"50 mg/min; 10-30 min en niños, 15-30 min en adultos; 50-100 mL en 30 min.","stab":"10-40 mg/mL: estable 2 días a 25 °C o 10 días en refrigeración.","mix":["Alopurinol","Amiodarona","Diltiazem","Gatifloxacino","Heparina sódica","Propofol","Teofilina","Warfarina"]}},"Cefuroxima":{},"Ciclofosfamida":{},"Cimetidina":{},"Ciprofloxacino":{"u":{"dil":"Dx 5%, 10%, SF 0,9%","rate":"1-2 mg/mL, aplicación lenta en no menos de 60 min; 100-200 mL en 60 min.","stab":"0,5-2 mg/mL: estable 14 días en refrigeración o a temperatura ambiente.","mix":["Ceftazidima","Claritromicina","Digoxina","Diltiazem","Difenhidramina","Dobutamina","Lorazepam","Metoclopramida","Midazolam","Potasio cloruro","Ranitidina","Verapamilo","Amiodarona"]}},"Cisatracurio":{"icu":1,"ref":[2,"mg/mL"]},"Cisplatino":{},"Citarabina":{},"Claritromicina":{},"Clindamicina":{"u":{"dil":"Dx 5%, 10%, SF 0,9%","rate":"300 mg/50 mL en 10 min; 600-900 mg/100 mL en 20-30 min; 1,2 g/100 mL en más de 40 min.","stab":"Reconstituida: estable 2 semanas a temperatura ambiente; no refrigerar.","mix":["Amiodarona","Anfotericina B","Ciclofosfamida","Ondansetrón","Midazolam","Teofilina","Diltiazem","Gatifloxacino","Heparina sódica","Levofloxacino","Meperidina"]}},"Clonidina":{"icu":1,"ref":[0.0075,"mg/mL"]},"Clonixinato de lisina":{"u":{"dil":"No mezclar","rate":"Infusión a 2 mg/mL durante 25 min.","stab":"Conservar la ampolla a temperatura ambiente; proteger de la luz.","mix":"NO"},"nomix":1},"Cloranfenicol":{},"Dacarbazina":{},"Dexametasona":{"u":{"dil":"Dx 5%, SF 0,9%","rate":"4 mg/mL, infusión lenta de 3 a 5 min.","stab":"Estable 24 h a temperatura ambiente; proteger de la luz.","mix":["Alopurinol","Amikacina","Anfotericina B","Cefepime","Fluconazol","Heparina sódica","Lorazepam","Meropenem","Ondansetrón","Teofilina","Levofloxacino","Piperacilina-tazobactam","Meperidina","Potasio cloruro"]}},"Dexmedetomidina":{"icu":1,"ref":[0.004,"mg/mL"]},"Diazepam":{},"Diclofenaco":{"u":{"dil":"De acuerdo al proveedor","rate":"2 mg/min.","stab":"Utilizar inmediatamente después de abrir. Ampolla a temperatura ambiente; proteger de la luz.","mix":"NO"},"nomix":1},"Dicloxacilina":{"u":{"dil":"Dx 5%, mixta, SF 0,9%","rate":"250 mg/100 mL de 1 a 2 h.","stab":"Diluida: estable 24 h a temperatura ambiente.","mix":"NO"},"nomix":1},"Difenhidramina":{},"Digoxina":{},"Diltiazem":{"icu":1,"ref":[1,"mg/mL"]},"Dinitrato de isosorbida":{"u":{"dil":"SF 0,9%, Dx 5%","rate":"1 mL/min para soluciones de concentración máxima 0,05%.","stab":"Incolora y estable a temperatura ambiente.","mix":"NO"}},"Dobutamina":{"icu":1,"ref":[8,"mg/mL"],"u":{"dil":"Dx 5%, mixta, SF 0,9%, Hartmann","rate":"Infusión IV; evitar bolos. Habitualmente 2-20 mcg/kg/min.","stab":"24 h a temperatura ambiente. Coloración rosada = oxidación ligera, sin pérdida de potencia si se administra en 24 h.","mix":["Amiodarona","Ciprofloxacino","Dopamina","Lidocaína","Meropenem","Propranolol","Ranitidina","Verapamilo"]}},"Dopamina":{"icu":1,"ref":[8,"mg/mL"],"u":{"dil":"Dx 5% y 10%, Dx 5% en SF, Ringer lactato, SF 0,9%","rate":"Inicio 2-5 mcg/kg/min, incrementos de 1-4 mcg/kg/min cada 10-30 min. Mantenimiento habitual ≤20 mcg/kg/min. ICC: 0,5-2 mcg/kg/min.","stab":"24 h a temperatura ambiente; no congelar; proteger de la luz. Color amarillo, marrón o rosa = descomposición: desechar.","mix":["Aminofilina","Calcio cloruro","Ciprofloxacino","Dobutamina","Heparina sódica","Lidocaína","Meropenem","Ranitidina","Verapamilo"]}},"Doxorrubicina":{},"Droperidol":{},"Enalaprilato":{},"Enoxaparina":{"u":{"dil":"SF 0,9%","rate":"Inyección subcutánea profunda. No intramuscular.","stab":"24 h a temperatura ambiente. No congelar las jeringas.","mix":"NO"},"nomix":1},"Eritromicina":{},"Escopolamina":{},"Esomeprazol":{"icu":1,"ref":[0.32,"mg/mL"]},"Etopósido":{},"Fenilefrina":{"icu":1,"ref":[0.2,"mg/mL"]},"Fenitoína":{"u":{"dil":"SF 0,9%","rate":"No exceder 50 mg/min en adultos; 1-3 mg/kg/min en neonatos. No se recomienda infusión intravenosa.","stab":"Estable 24 h a temperatura ambiente mientras siga libre de turbidez o precipitado. Refrigerada puede precipitar (se redisuelve a temperatura ambiente).","mix":["Verapamilo","Bicarbonato sódico"]}},"Fenobarbital":{},"Fentanilo":{"icu":1,"ref":[0.03,"mg/mL"]},"Filgrastim":{},"Flucloxacilina":{},"Fluconazol":{},"Flumazenilo":{"icu":1,"ref":[0.04,"mg/mL"]},"Furosemida":{"icu":1,"ref":[2,"mg/mL"],"u":{"dil":"Dx 5%, 10%, mixta, SF 0,9%, Manitol 20%","rate":"IV directa lenta en 1-2 min. En infusión no exceder 4 mg/min.","stab":"24 h a temperatura ambiente; proteger de la luz. No usar si está amarilla. En refrigeración puede precipitar.","mix":["Amikacina","Ampicilina","Cefuroxima","Dexametasona","Digoxina","Dinitrato de isosorbida","Meropenem","Penicilina G","Ranitidina","Bicarbonato sódico","Teofilina"]}},"Gatifloxacino":{},"Gentamicina":{},"Haloperidol":{"u":{"dil":"Dx 5%","rate":"Depende del fabricante.","stab":"No refrigerar; proteger de la luz.","mix":["Buprenorfina","Metoclopramida","Midazolam"]}},"Heparina sódica":{"icu":1,"ref":[50,"UI/mL"]},"Hidrocortisona":{},"Hidromorfona":{},"Imipenem":{"u":{"dil":"SF 0,9% a concentración ≤5 mg/mL","rate":"Adultos: 125-500 mg en 20-30 min; 1 g en 40-60 min. Pediatría: ≤500 mg en 15-30 min.","stab":"Preparado: estable 4 h a temperatura ambiente o 24 h en refrigeración. No usar si marrón.","mix":"NO"}},"Indometacina":{},"Insulina":{"icu":1,"ref":[1,"UI/mL"]},"Isoproterenol":{"icu":1,"ref":[0.004,"mg/mL"]},"Ketamina":{"icu":1,"ref":[50,"mg/mL"]},"Ketorolaco":{"u":{"dil":"Dx 5%, mixta, SF 0,9%","rate":"IV directa 3 mg/min. Diluir 30 mg/10 mL.","stab":"24 h a temperatura ambiente; proteger de la luz.","mix":["Amikacina","Ceftriaxona","Ceftazidima","Ranitidina","Ondansetrón","Metoclopramida","Metronidazol"]}},"Labetalol":{"icu":1,"ref":[2,"mg/mL"]},"Levofloxacino":{"u":{"dil":"Dx 5%, mixta, SF 0,9%","rate":"Infusión ≥60-90 min, solo a 5 mg/mL. Evitar administración rápida (hipotensión). 250-500 mg en 60 min; 750 mg en 90 min.","stab":"Diluido: hasta 72 h a ≤25 °C o 14 días a 5 °C. Proteger de la luz.","mix":"NO"}},"Lidocaína":{},"Lincomicina":{},"Lorazepam":{},"Magnesio sulfato":{"icu":1,"ref":[15,"mg/mL"]},"Manitol":{},"Meperidina":{},"Meropenem":{"icu":1,"ref":[30,"mg/mL"],"u":{"dil":"Dx 5%, SF 0,9% (estabilidad limitada)","rate":"IV directa 5-20 mL en 3-5 min. Infusión diluido en 50 mL en 15-30 min.","stab":"50 mg/mL: 2 h a 15-25 °C o 12 h a 4 °C. En Dx 5%: 1 h a 15-25 °C u 8 h a 4 °C. No congelar.","mix":["Dobutamina","Dopamina","Fluconazol","Furosemida","Gentamicina","Heparina sódica","Insulina","Metoclopramida","Ranitidina","Ondansetrón","Vancomicina"]}},"Metadona":{"icu":1,"ref":[0.2,"mg/mL"]},"Metamizol":{"u":{"dil":"Dx 5%, SF 0,9%, Ringer lactato","rate":"IV muy lenta, no más de 1 mL/min (riesgo de hipotensión). Diluir la ampolla 1:10.","stab":"Utilizar inmediatamente después de abrir.","mix":"NO"},"nomix":1},"Metilprednisolona":{},"Metoclopramida":{"u":{"dil":"Dx 5%, SF 0,9%","rate":"IV directa: 10 mg en 1-2 min (rápido produce ansiedad y somnolencia). Infusión ≥15 min.","stab":"Diluida: 24 h a temperatura ambiente; proteger de la luz; no congelar.","mix":["Clindamicina","Potasio cloruro","Meropenem","Morfina cloruro","Multivitaminas","Verapamilo"]}},"Metotrexato":{},"Metronidazol":{"u":{"dil":"Dx 5%, SF 0,9%, mixta, Hartmann","rate":"5 mL/min; infundir en 1 hora.","stab":"Almacenar a 15-25 °C; proteger de la luz; no refrigerar (cristaliza).","mix":["Amikacina","Cefotaxima","Ceftazidima","Ceftriaxona","Cloranfenicol","Ciprofloxacino","Clindamicina","Fluconazol","Tobramicina","Midazolam"]}},"Midazolam":{"icu":1,"ref":[4,"mg/mL"],"u":{"dil":"Dx 5%, SF 0,9%","rate":"Individualizado según sedación o anestesia.","stab":"Estable a temperatura ambiente máximo 24 h.","mix":["Hidromorfona"]}},"Milrinona":{"icu":1,"ref":[0.2,"mg/mL"]},"Morfina cloruro":{"icu":1,"ref":[1,"mg/mL"]},"Multivitaminas":{},"N-acetilcisteína":{"icu":1,"ref":[50,"mg/mL"]},"Nalbufina":{"u":{"dil":"Dx 5%, SF 0,9%","rate":"IV en 10-15 min.","stab":"Estable a temperatura ambiente; proteger de la luz.","mix":["Droperidol","Escopolamina","Ranitidina"]}},"Naloxona":{"icu":1,"ref":[0.008,"mg/mL"]},"Nitroglicerina":{"icu":1,"ref":[0.2,"mg/mL"]},"Nitroprusiato":{"icu":1,"ref":[0.2,"mg/mL"]},"Noradrenalina":{"icu":1,"ref":[0.32,"mg/mL"]},"Nutrición parenteral lipídica":{"icu":1},"Nutrición parenteral NO lipídica":{"icu":1},"Ofloxacino":{},"Omeprazol":{"u":{"dil":"SF 0,9%","rate":"40 mg/hora (según guía).","stab":"24 h a temperatura ambiente; proteger de la luz.","mix":"NO"},"nomix":1},"Ondansetrón":{"u":{"dil":"SF 0,9%","rate":"IV directa 2-5 min. Infusión 15 min.","stab":"Soluciones para infusión estables 48 h a temperatura ambiente; proteger de la luz.","mix":["Cisplatino","Ciclofosfamida","Citarabina","Dacarbazina","Doxorrubicina","Etopósido","Metotrexato","Fluconazol","Meperidina","Morfina cloruro"]}},"Pantoprazol":{"icu":1,"ref":[0.32,"mg/mL"]},"Penicilina G":{},"Penicilina G potásica":{},"Pentobarbital":{},"Piperacilina":{},"Piperacilina-tazobactam":{"icu":1,"ref":[64,"mg/mL"],"u":{"dil":"Dx 5%, SF 0,9%, solución para diálisis","rate":"Infusión IV en más de 30 min.","stab":"Reconstituida: hasta 24 h a 20-25 °C o 48 h en refrigeración.","mix":"NO"}},"Potasio cloruro":{"icu":1,"ref":[0.12,"mEq/mL"]},"Propofol":{"icu":1,"ref":[10,"mg/mL"]},"Propranolol":{},"Ranitidina":{"u":{"dil":"Dx 5%, SF 0,9%","rate":"50 mg/20 mL a 4 mL/min.","stab":"Diluida: 24 h a temperatura ambiente; proteger de la luz; no congelar.","mix":["Amikacina","Aminofilina","Cloranfenicol","Ciprofloxacino","Dexametasona","Digoxina","Dobutamina","Adrenalina","Gentamicina","Heparina sódica","Isoproterenol","Lidocaína","Lincomicina","Meropenem","Metilprednisolona","Potasio cloruro","Nitroprusiato","Vecuronio"]}},"Remifentanilo":{"icu":1,"ref":[0.02,"mg/mL"]},"Somatostatina":{"icu":1,"ref":[0.024,"mg/mL"]},"Tacrolimus":{},"Teofilina":{},"Tiamina (vitamina B1)":{},"Tobramicina":{},"Trimetoprim-sulfametoxazol":{"u":{"dil":"SF 0,9%","rate":"Cada ampolla de 3 mL diluida en 250 mL, en 60-90 min.","stab":"15-25 °C, no refrigerar; usar en las 8 h siguientes a abrir.","mix":["Heparina sódica"]}},"Vancomicina":{"u":{"dil":"Dx 5%, SF 0,9%, mixta","rate":"No más de 5 mg/mL ni 10 mg/min. 500 mg/100 mL o 1 g/200 mL en más de 1 hora.","stab":"Diluida: 14 días en refrigeración; fuera de nevera 2 h a temperatura ambiente.","mix":["Amikacina","Calcio gluconato","Cefepime","Meropenem","Ofloxacino","Potasio cloruro","Ranitidina","Verapamilo"]}},"Vecuronio":{"icu":1,"ref":[0.2,"mg/mL"]},"Verapamilo":{"icu":1,"ref":[0.1,"mg/mL"]},"Warfarina":{},"Zidovudina":{},"Ácido ascórbico":{}},"pairs":{"Adrenalina|Amiodarona":{"A":"C_G"},"Adrenalina|Bicarbonato sódico":{"A":"I"},"Adrenalina|Calcio cloruro":{"A":"C"},"Adrenalina|Calcio gluconato":{"A":"C"},"Adrenalina|Ceftazidima":{"A":"C"},"Adrenalina|Cisatracurio":{"A":"C"},"Adrenalina|Clonidina":{"A":"C_SF"},"Adrenalina|Dexmedetomidina":{"A":"C"},"Adrenalina|Diltiazem":{"A":"C"},"Adrenalina|Dobutamina":{"A":"C"},"Adrenalina|Dopamina":{"A":"C"},"Adrenalina|Esomeprazol":{"A":"C"},"Adrenalina|Fentanilo":{"A":"C"},"Adrenalina|Furosemida":{"A":"C"},"Adrenalina|Heparina sódica":{"A":"C"},"Adrenalina|Ketamina":{"A":"C"},"Adrenalina|Labetalol":{"A":"C"},"Adrenalina|Metadona":{"A":"C"},"Adrenalina|Midazolam":{"A":"C","U":["C","Midazolam"]},"Adrenalina|Milrinona":{"A":"C"},"Adrenalina|Morfina cloruro":{"A":"C"},"Adrenalina|N-acetilcisteína":{"A":"I"},"Adrenalina|Nitroglicerina":{"A":"C"},"Adrenalina|Nitroprusiato":{"A":"C_G"},"Adrenalina|Noradrenalina":{"A":"C_G"},"Adrenalina|Pantoprazol":{"A":"IC"},"Adrenalina|Potasio cloruro":{"A":"C"},"Adrenalina|Propofol":{"A":"C"},"Adrenalina|Remifentanilo":{"A":"C"},"Adrenalina|Vecuronio":{"A":"C"},"Adrenalina|Verapamilo":{"A":"IC"},"Amiodarona|Argatroban":{"A":"I"},"Amiodarona|Bicarbonato sódico":{"A":"I"},"Amiodarona|Calcio cloruro":{"A":"C_G"},"Amiodarona|Calcio gluconato":{"A":"C_G"},"Amiodarona|Ceftazidima":{"A":"I"},"Amiodarona|Cisatracurio":{"A":"C_G"},"Amiodarona|Dexmedetomidina":{"A":"C"},"Amiodarona|Dobutamina":{"A":"C_G","U":["C","Dobutamina"]},"Amiodarona|Dopamina":{"A":"C_G","U":["C","Dopamina"]},"Amiodarona|Fenilefrina":{"A":"IC_G"},"Amiodarona|Fentanilo":{"A":"C_G"},"Amiodarona|Furosemida":{"A":"IC_G"},"Amiodarona|Heparina sódica":{"A":"I"},"Amiodarona|Insulina":{"A":"C_G","U":["C","Amiodarona"]},"Amiodarona|Isoproterenol":{"A":"C_G"},"Amiodarona|Ketamina":{"A":"C_G"},"Amiodarona|Labetalol":{"A":"C_G"},"Amiodarona|Magnesio sulfato":{"A":"I"},"Amiodarona|Midazolam":{"A":"C_G"},"Amiodarona|Milrinona":{"A":"C_G"},"Amiodarona|Morfina cloruro":{"A":"C_G"},"Amiodarona|Nitroglicerina":{"A":"C_G"},"Amiodarona|Nitroprusiato":{"A":"IC_G"},"Amiodarona|Noradrenalina":{"A":"C_G"},"Amiodarona|Pantoprazol":{"A":"I"},"Amiodarona|Piperacilina-tazobactam":{"A":"I"},"Amiodarona|Potasio cloruro":{"A":"C_G","U":["C","Amiodarona"]},"Amiodarona|Vecuronio":{"A":"C_G"},"Amiodarona|Verapamilo":{"A":"C_G"},"Argatroban|Diltiazem":{"A":"C"},"Argatroban|Dobutamina":{"A":"C"},"Argatroban|Dopamina":{"A":"C"},"Argatroban|Fenilefrina":{"A":"C"},"Argatroban|Fentanilo":{"A":"C"},"Argatroban|Furosemida":{"A":"C"},"Argatroban|Midazolam":{"A":"C"},"Argatroban|Milrinona":{"A":"C"},"Argatroban|Morfina cloruro":{"A":"C"},"Argatroban|Nitroglicerina":{"A":"C"},"Argatroban|Nitroprusiato":{"A":"C_G"},"Argatroban|Noradrenalina":{"A":"C_G"},"Argatroban|Verapamilo":{"A":"C"},"Bicarbonato sódico|Calcio cloruro":{"A":"I"},"Bicarbonato sódico|Cisatracurio":{"A":"I"},"Bicarbonato sódico|Dexmedetomidina":{"A":"C"},"Bicarbonato sódico|Diltiazem":{"A":"C"},"Bicarbonato sódico|Dobutamina":{"A":"I"},"Bicarbonato sódico|Dopamina":{"A":"I"},"Bicarbonato sódico|Fenilefrina":{"A":"C"},"Bicarbonato sódico|Fentanilo":{"A":"C"},"Bicarbonato sódico|Furosemida":{"A":"C"},"Bicarbonato sódico|Heparina sódica":{"A":"C"},"Bicarbonato sódico|Insulina":{"A":"C"},"Bicarbonato sódico|Isoproterenol":{"A":"I"},"Bicarbonato sódico|Ketamina":{"A":"I"},"Bicarbonato sódico|Labetalol":{"A":"I"},"Bicarbonato sódico|Magnesio sulfato":{"A":"C"},"Bicarbonato sódico|Metadona":{"A":"C"},"Bicarbonato sódico|Midazolam":{"A":"I"},"Bicarbonato sódico|Milrinona":{"A":"C"},"Bicarbonato sódico|Morfina cloruro":{"A":"C"},"Bicarbonato sódico|Nutrición parenteral NO lipídica":{"A":"I"},"Bicarbonato sódico|Nutrición parenteral lipídica":{"A":"I"},"Bicarbonato sódico|Naloxona":{"A":"I"},"Bicarbonato sódico|Nitroglicerina":{"A":"C"},"Bicarbonato sódico|Noradrenalina":{"A":"I"},"Bicarbonato sódico|Pantoprazol":{"A":"I"},"Bicarbonato sódico|Potasio cloruro":{"A":"C"},"Bicarbonato sódico|Propofol":{"A":"C"},"Bicarbonato sódico|Remifentanilo":{"A":"C"},"Bicarbonato sódico|Somatostatina":{"A":"I"},"Bicarbonato sódico|Verapamilo":{"A":"I"},"Calcio cloruro|Calcio gluconato":{"A":"C"},"Calcio cloruro|Dobutamina":{"A":"IC","U":["C","Dobutamina"]},"Calcio cloruro|Dopamina":{"A":"C"},"Calcio cloruro|Furosemida":{"A":"C"},"Calcio cloruro|Heparina sódica":{"A":"C"},"Calcio cloruro|Magnesio sulfato":{"A":"I"},"Calcio cloruro|Milrinona":{"A":"C"},"Calcio cloruro|Morfina cloruro":{"A":"C"},"Calcio cloruro|Nitroprusiato":{"A":"C_G"},"Calcio cloruro|Pantoprazol":{"A":"I"},"Calcio cloruro|Potasio cloruro":{"A":"C"},"Calcio cloruro|Propofol":{"A":"C"},"Calcio cloruro|Verapamilo":{"A":"C"},"Calcio gluconato|Cisatracurio":{"A":"C"},"Calcio gluconato|Dexmedetomidina":{"A":"C"},"Calcio gluconato|Dobutamina":{"A":"IC_SF","U":["C","Dobutamina"]},"Calcio gluconato|Fentanilo":{"A":"C"},"Calcio gluconato|Furosemida":{"A":"C"},"Calcio gluconato|Heparina sódica":{"A":"C"},"Calcio gluconato|Ketamina":{"A":"C"},"Calcio gluconato|Labetalol":{"A":"C"},"Calcio gluconato|Magnesio sulfato":{"A":"C"},"Calcio gluconato|Midazolam":{"A":"C","U":["C","Midazolam"]},"Calcio gluconato|Milrinona":{"A":"C"},"Calcio gluconato|Noradrenalina":{"A":"C_G"},"Calcio gluconato|Pantoprazol":{"A":"I"},"Calcio gluconato|Potasio cloruro":{"A":"C"},"Calcio gluconato|Propofol":{"A":"C"},"Calcio gluconato|Remifentanilo":{"A":"C"},"Calcio gluconato|Verapamilo":{"A":"C"},"Ceftazidima|Dexmedetomidina":{"A":"C"},"Ceftazidima|Dobutamina":{"A":"IC"},"Ceftazidima|Dopamina":{"A":"IC"},"Ceftazidima|Furosemida":{"A":"C","U":["C","Furosemida"]},"Ceftazidima|Insulina":{"A":"C"},"Ceftazidima|Ketamina":{"A":"IC"},"Ceftazidima|Midazolam":{"A":"I"},"Ceftazidima|Milrinona":{"A":"C"},"Ceftazidima|Morfina cloruro":{"A":"C"},"Ceftazidima|N-acetilcisteína":{"A":"I"},"Ceftazidima|Propofol":{"A":"I"},"Ceftazidima|Remifentanilo":{"A":"C"},"Cisatracurio|Dexmedetomidina":{"A":"C"},"Cisatracurio|Diltiazem":{"A":"C"},"Cisatracurio|Dobutamina":{"A":"C"},"Cisatracurio|Dopamina":{"A":"C"},"Cisatracurio|Esomeprazol":{"A":"C"},"Cisatracurio|Fenilefrina":{"A":"C"},"Cisatracurio|Fentanilo":{"A":"C"},"Cisatracurio|Furosemida":{"A":"I"},"Cisatracurio|Heparina sódica":{"A":"C"},"Cisatracurio|Insulina":{"A":"C"},"Cisatracurio|Isoproterenol":{"A":"C"},"Cisatracurio|Magnesio sulfato":{"A":"C"},"Cisatracurio|Midazolam":{"A":"C"},"Cisatracurio|Milrinona":{"A":"C"},"Cisatracurio|Morfina cloruro":{"A":"C"},"Cisatracurio|Nitroglicerina":{"A":"C"},"Cisatracurio|Nitroprusiato":{"A":"I"},"Cisatracurio|Noradrenalina":{"A":"C_G"},"Cisatracurio|Pantoprazol":{"A":"I"},"Cisatracurio|Potasio cloruro":{"A":"C"},"Cisatracurio|Propofol":{"A":"I"},"Cisatracurio|Remifentanilo":{"A":"C"},"Clonidina|Dobutamina":{"A":"C"},"Clonidina|Dopamina":{"A":"C"},"Clonidina|Esomeprazol":{"A":"C"},"Clonidina|Fentanilo":{"A":"C"},"Clonidina|Furosemida":{"A":"C"},"Clonidina|Heparina sódica":{"A":"C"},"Clonidina|Insulina":{"A":"C"},"Clonidina|Isoproterenol":{"A":"C_SF"},"Clonidina|Labetalol":{"A":"C"},"Clonidina|Magnesio sulfato":{"A":"C"},"Clonidina|Metadona":{"A":"C"},"Clonidina|Midazolam":{"A":"I"},"Clonidina|Morfina cloruro":{"A":"C"},"Clonidina|Nitroglicerina":{"A":"C"},"Clonidina|Noradrenalina":{"A":"C_G"},"Clonidina|Pantoprazol":{"A":"C"},"Clonidina|Verapamilo":{"A":"C"},"Dexmedetomidina|Diltiazem":{"A":"C"},"Dexmedetomidina|Dobutamina":{"A":"C"},"Dexmedetomidina|Dopamina":{"A":"C"},"Dexmedetomidina|Furosemida":{"A":"C"},"Dexmedetomidina|Heparina sódica":{"A":"C"},"Dexmedetomidina|Isoproterenol":{"A":"C"},"Dexmedetomidina|Labetalol":{"A":"C"},"Dexmedetomidina|Magnesio sulfato":{"A":"C"},"Dexmedetomidina|Milrinona":{"A":"C"},"Dexmedetomidina|Nitroglicerina":{"A":"C"},"Dexmedetomidina|Nitroprusiato":{"A":"C"},"Dexmedetomidina|Noradrenalina":{"A":"C"},"Dexmedetomidina|Piperacilina-tazobactam":{"A":"IC"},"Dexmedetomidina|Potasio cloruro":{"A":"C"},"Dexmedetomidina|Propofol":{"A":"C"},"Dexmedetomidina|Remifentanilo":{"A":"C"},"Dexmedetomidina|Verapamilo":{"A":"C"},"Diltiazem|Dobutamina":{"A":"C"},"Diltiazem|Dopamina":{"A":"C"},"Diltiazem|Fentanilo":{"A":"C"},"Diltiazem|Furosemida":{"A":"I"},"Diltiazem|Heparina sódica":{"A":"C"},"Diltiazem|Insulina":{"A":"I"},"Diltiazem|Labetalol":{"A":"C"},"Diltiazem|Midazolam":{"A":"C"},"Diltiazem|Milrinona":{"A":"C"},"Diltiazem|Morfina cloruro":{"A":"C"},"Diltiazem|Nitroglicerina":{"A":"C"},"Diltiazem|Nitroprusiato":{"A":"C_G"},"Diltiazem|Noradrenalina":{"A":"C_G"},"Diltiazem|Potasio cloruro":{"A":"C"},"Diltiazem|Vecuronio":{"A":"C"},"Dobutamina|Dopamina":{"A":"C","U":["C","Dopamina"]},"Dobutamina|Esomeprazol":{"A":"I"},"Dobutamina|Fenilefrina":{"A":"C"},"Dobutamina|Fentanilo":{"A":"C","U":["C","Dobutamina"]},"Dobutamina|Flumazenilo":{"A":"C"},"Dobutamina|Furosemida":{"A":"I"},"Dobutamina|Heparina sódica":{"A":"IC_SF"},"Dobutamina|Insulina":{"A":"C"},"Dobutamina|Isoproterenol":{"A":"C"},"Dobutamina|Ketamina":{"A":"C"},"Dobutamina|Labetalol":{"A":"C"},"Dobutamina|Magnesio sulfato":{"A":"IC"},"Dobutamina|Metadona":{"A":"C"},"Dobutamina|Midazolam":{"A":"C_G"},"Dobutamina|Milrinona":{"A":"C"},"Dobutamina|Morfina cloruro":{"A":"C"},"Dobutamina|Nutrición parenteral NO lipídica":{"A":"C"},"Dobutamina|Nutrición parenteral lipídica":{"A":"C"},"Dobutamina|N-acetilcisteína":{"A":"I"},"Dobutamina|Nitroglicerina":{"A":"C"},"Dobutamina|Nitroprusiato":{"A":"C_G"},"Dobutamina|Noradrenalina":{"A":"C_G"},"Dobutamina|Pantoprazol":{"A":"I"},"Dobutamina|Potasio cloruro":{"A":"IC"},"Dobutamina|Propofol":{"A":"C"},"Dobutamina|Remifentanilo":{"A":"C"},"Dobutamina|Somatostatina":{"A":"C"},"Dobutamina|Vecuronio":{"A":"C"},"Dobutamina|Verapamilo":{"A":"C","U":["C","Dobutamina"]},"Dopamina|Esomeprazol":{"A":"I"},"Dopamina|Fentanilo":{"A":"C","U":["C","Dopamina"]},"Dopamina|Flumazenilo":{"A":"C"},"Dopamina|Furosemida":{"A":"C"},"Dopamina|Heparina sódica":{"A":"C"},"Dopamina|Insulina":{"A":"C"},"Dopamina|Ketamina":{"A":"C"},"Dopamina|Labetalol":{"A":"C"},"Dopamina|Metadona":{"A":"C"},"Dopamina|Midazolam":{"A":"IC_G","U":["C","Midazolam"]},"Dopamina|Milrinona":{"A":"C"},"Dopamina|Morfina cloruro":{"A":"C"},"Dopamina|Nutrición parenteral NO lipídica":{"A":"C"},"Dopamina|Nutrición parenteral lipídica":{"A":"I"},"Dopamina|Nitroglicerina":{"A":"C"},"Dopamina|Nitroprusiato":{"A":"C_G"},"Dopamina|Noradrenalina":{"A":"C_G"},"Dopamina|Pantoprazol":{"A":"C"},"Dopamina|Potasio cloruro":{"A":"C"},"Dopamina|Propofol":{"A":"C"},"Dopamina|Remifentanilo":{"A":"C"},"Dopamina|Somatostatina":{"A":"C"},"Dopamina|Vecuronio":{"A":"C"},"Dopamina|Verapamilo":{"A":"C"},"Esomeprazol|Fentanilo":{"A":"C"},"Esomeprazol|Flumazenilo":{"A":"C"},"Esomeprazol|Furosemida":{"A":"C"},"Esomeprazol|Insulina":{"A":"C"},"Esomeprazol|Labetalol":{"A":"I"},"Esomeprazol|Metadona":{"A":"C"},"Esomeprazol|Midazolam":{"A":"I"},"Esomeprazol|Morfina cloruro":{"A":"C"},"Esomeprazol|Nitroglicerina":{"A":"C"},"Esomeprazol|Somatostatina":{"A":"C"},"Fenilefrina|Furosemida":{"A":"I"},"Fenilefrina|Propofol":{"A":"C"},"Fenilefrina|Remifentanilo":{"A":"C"},"Fentanilo|Furosemida":{"A":"C","U":["C","Furosemida"]},"Fentanilo|Heparina sódica":{"A":"C"},"Fentanilo|Ketamina":{"A":"C"},"Fentanilo|Labetalol":{"A":"C"},"Fentanilo|Midazolam":{"A":"C","U":["C","Midazolam"]},"Fentanilo|Milrinona":{"A":"C"},"Fentanilo|Morfina cloruro":{"A":"C"},"Fentanilo|Nutrición parenteral NO lipídica":{"A":"C"},"Fentanilo|Nutrición parenteral lipídica":{"A":"C"},"Fentanilo|N-acetilcisteína":{"A":"I"},"Fentanilo|Nitroglicerina":{"A":"C"},"Fentanilo|Noradrenalina":{"A":"C_G"},"Fentanilo|Pantoprazol":{"A":"C"},"Fentanilo|Potasio cloruro":{"A":"C"},"Fentanilo|Propofol":{"A":"C"},"Fentanilo|Remifentanilo":{"A":"IC"},"Fentanilo|Vecuronio":{"A":"C"},"Flumazenilo|Heparina sódica":{"A":"C"},"Furosemida|Heparina sódica":{"A":"C"},"Furosemida|Insulina":{"A":"C"},"Furosemida|Isoproterenol":{"A":"I"},"Furosemida|Ketamina":{"A":"I"},"Furosemida|Labetalol":{"A":"I"},"Furosemida|Magnesio sulfato":{"A":"I"},"Furosemida|Metadona":{"A":"C"},"Furosemida|Midazolam":{"A":"I"},"Furosemida|Milrinona":{"A":"I"},"Furosemida|Morfina cloruro":{"A":"I"},"Furosemida|Nutrición parenteral NO lipídica":{"A":"I"},"Furosemida|Nutrición parenteral lipídica":{"A":"C"},"Furosemida|Nitroglicerina":{"A":"C"},"Furosemida|Nitroprusiato":{"A":"C_G"},"Furosemida|Noradrenalina":{"A":"C_G"},"Furosemida|Pantoprazol":{"A":"C"},"Furosemida|Potasio cloruro":{"A":"C"},"Furosemida|Propofol":{"A":"C"},"Furosemida|Remifentanilo":{"A":"C"},"Furosemida|Vecuronio":{"A":"I"},"Furosemida|Verapamilo":{"A":"I"},"Heparina sódica|Insulina":{"A":"C"},"Heparina sódica|Isoproterenol":{"A":"C"},"Heparina sódica|Ketamina":{"A":"I"},"Heparina sódica|Labetalol":{"A":"C"},"Heparina sódica|Magnesio sulfato":{"A":"C"},"Heparina sódica|Metadona":{"A":"C"},"Heparina sódica|Midazolam":{"A":"C","U":["C","Midazolam"]},"Heparina sódica|Milrinona":{"A":"C"},"Heparina sódica|Morfina cloruro":{"A":"C"},"Heparina sódica|Nutrición parenteral NO lipídica":{"A":"C"},"Heparina sódica|Nutrición parenteral lipídica":{"A":"I"},"Heparina sódica|Naloxona":{"A":"C"},"Heparina sódica|Nitroglicerina":{"A":"C"},"Heparina sódica|Nitroprusiato":{"A":"C_G"},"Heparina sódica|Noradrenalina":{"A":"C_G"},"Heparina sódica|Pantoprazol":{"A":"I"},"Heparina sódica|Potasio cloruro":{"A":"C"},"Heparina sódica|Propofol":{"A":"C"},"Heparina sódica|Remifentanilo":{"A":"C"},"Heparina sódica|Vecuronio":{"A":"C"},"Heparina sódica|Verapamilo":{"A":"IC"},"Insulina|Ketamina":{"A":"I"},"Insulina|Labetalol":{"A":"I"},"Insulina|Magnesio sulfato":{"A":"C"},"Insulina|Metadona":{"A":"C"},"Insulina|Midazolam":{"A":"C"},"Insulina|Milrinona":{"A":"C"},"Insulina|Morfina cloruro":{"A":"C"},"Insulina|Nutrición parenteral NO lipídica":{"A":"C"},"Insulina|Nutrición parenteral lipídica":{"A":"C"},"Insulina|N-acetilcisteína":{"A":"I"},"Insulina|Nitroglicerina":{"A":"C"},"Insulina|Nitroprusiato":{"A":"C_G"},"Insulina|Noradrenalina":{"A":"C"},"Insulina|Pantoprazol":{"A":"C"},"Insulina|Potasio cloruro":{"A":"C"},"Insulina|Propofol":{"A":"C"},"Isoproterenol|Magnesio sulfato":{"A":"IC"},"Isoproterenol|Milrinona":{"A":"C"},"Isoproterenol|Nutrición parenteral NO lipídica":{"A":"C"},"Isoproterenol|Nutrición parenteral lipídica":{"A":"C"},"Isoproterenol|Nitroprusiato":{"A":"C_G"},"Isoproterenol|Pantoprazol":{"A":"I"},"Isoproterenol|Potasio cloruro":{"A":"IC"},"Isoproterenol|Propofol":{"A":"C"},"Isoproterenol|Remifentanilo":{"A":"C"},"Isoproterenol|Vecuronio":{"A":"IC_G"},"Isoproterenol|Verapamilo":{"A":"IC"},"Ketamina|Magnesio sulfato":{"A":"C"},"Ketamina|Midazolam":{"A":"C"},"Ketamina|Milrinona":{"A":"C"},"Ketamina|Morfina cloruro":{"A":"C"},"Ketamina|Nitroglicerina":{"A":"I"},"Ketamina|Potasio cloruro":{"A":"C"},"Ketamina|Propofol":{"A":"C"},"Labetalol|Magnesio sulfato":{"A":"C"},"Labetalol|Midazolam":{"A":"C"},"Labetalol|Milrinona":{"A":"C"},"Labetalol|Morfina cloruro":{"A":"C"},"Labetalol|Nitroglicerina":{"A":"C"},"Labetalol|Nitroprusiato":{"A":"C_G"},"Labetalol|Noradrenalina":{"A":"C_G"},"Labetalol|Pantoprazol":{"A":"I"},"Labetalol|Potasio cloruro":{"A":"C"},"Labetalol|Propofol":{"A":"C"},"Labetalol|Vecuronio":{"A":"C"},"Magnesio sulfato|Milrinona":{"A":"C"},"Magnesio sulfato|Morfina cloruro":{"A":"C"},"Magnesio sulfato|Nitroprusiato":{"A":"C_G"},"Magnesio sulfato|Pantoprazol":{"A":"I"},"Magnesio sulfato|Potasio cloruro":{"A":"C"},"Magnesio sulfato|Propofol":{"A":"C"},"Magnesio sulfato|Remifentanilo":{"A":"C"},"Magnesio sulfato|Verapamilo":{"A":"C"},"Meropenem|Milrinona":{"A":"C"},"Meropenem|Potasio cloruro":{"A":"IC"},"Metadona|Midazolam":{"A":"C"},"Metadona|Noradrenalina":{"A":"C_G"},"Metadona|Pantoprazol":{"A":"C"},"Midazolam|Milrinona":{"A":"C"},"Midazolam|Morfina cloruro":{"A":"C"},"Midazolam|Nutrición parenteral NO lipídica":{"A":"I"},"Midazolam|Nutrición parenteral lipídica":{"A":"I"},"Midazolam|Nitroglicerina":{"A":"C"},"Midazolam|Nitroprusiato":{"A":"C_G"},"Midazolam|Noradrenalina":{"A":"C_G"},"Midazolam|Pantoprazol":{"A":"I"},"Midazolam|Potasio cloruro":{"A":"C"},"Midazolam|Propofol":{"A":"C"},"Midazolam|Remifentanilo":{"A":"C"},"Midazolam|Somatostatina":{"A":"C"},"Midazolam|Vecuronio":{"A":"C","U":["C","Midazolam"]},"Milrinona|Morfina cloruro":{"A":"C"},"Milrinona|Nitroglicerina":{"A":"C"},"Milrinona|Nitroprusiato":{"A":"C_G"},"Milrinona|Noradrenalina":{"A":"C_G"},"Milrinona|Piperacilina-tazobactam":{"A":"C"},"Milrinona|Potasio cloruro":{"A":"C"},"Milrinona|Propofol":{"A":"C"},"Milrinona|Vecuronio":{"A":"C"},"Milrinona|Verapamilo":{"A":"C"},"Morfina cloruro|Nutrición parenteral NO lipídica":{"A":"C"},"Morfina cloruro|Nutrición parenteral lipídica":{"A":"C"},"Morfina cloruro|Nitroglicerina":{"A":"C"},"Morfina cloruro|Nitroprusiato":{"A":"C_G"},"Morfina cloruro|Noradrenalina":{"A":"C_G"},"Morfina cloruro|Pantoprazol":{"A":"C"},"Morfina cloruro|Potasio cloruro":{"A":"C"},"Morfina cloruro|Propofol":{"A":"C"},"Morfina cloruro|Remifentanilo":{"A":"C"},"Morfina cloruro|Vecuronio":{"A":"C"},"Morfina cloruro|Verapamilo":{"A":"C"},"Nitroglicerina|Nutrición parenteral NO lipídica":{"A":"C"},"Nitroprusiato|Nutrición parenteral NO lipídica":{"A":"C_G"},"Noradrenalina|Nutrición parenteral NO lipídica":{"A":"C_G"},"Nitroglicerina|Nutrición parenteral lipídica":{"A":"C"},"Nitroprusiato|Nutrición parenteral lipídica":{"A":"C_G"},"Noradrenalina|Nutrición parenteral lipídica":{"A":"C_G"},"Nutrición parenteral lipídica|Pantoprazol":{"A":"C"},"Naloxona|Nitroglicerina":{"A":"I"},"Naloxona|Pantoprazol":{"A":"I"},"Naloxona|Propofol":{"A":"I"},"Naloxona|Verapamilo":{"A":"IC"},"Nitroglicerina|Nitroprusiato":{"A":"C_G"},"Nitroglicerina|Noradrenalina":{"A":"C_G"},"Nitroglicerina|Pantoprazol":{"A":"C"},"Nitroglicerina|Propofol":{"A":"C"},"Nitroglicerina|Remifentanilo":{"A":"C"},"Nitroglicerina|Vecuronio":{"A":"C"},"Nitroglicerina|Verapamilo":{"A":"IC"},"Nitroprusiato|Noradrenalina":{"A":"C_G"},"Nitroprusiato|Pantoprazol":{"A":"I"},"Nitroprusiato|Propofol":{"A":"C_G"},"Nitroprusiato|Vecuronio":{"A":"IC_G"},"Nitroprusiato|Verapamilo":{"A":"IC_G"},"Noradrenalina|Pantoprazol":{"A":"I"},"Noradrenalina|Potasio cloruro":{"A":"C_G"},"Noradrenalina|Propofol":{"A":"C_G"},"Noradrenalina|Remifentanilo":{"A":"C_G"},"Noradrenalina|Somatostatina":{"A":"C_G"},"Noradrenalina|Vecuronio":{"A":"C_G"},"Noradrenalina|Verapamilo":{"A":"IC_G"},"Pantoprazol|Potasio cloruro":{"A":"C"},"Pantoprazol|Propofol":{"A":"I"},"Pantoprazol|Somatostatina":{"A":"C"},"Pantoprazol|Vecuronio":{"A":"I"},"Pantoprazol|Verapamilo":{"A":"I"},"Piperacilina-tazobactam|Remifentanilo":{"A":"IC"},"Potasio cloruro|Propofol":{"A":"C"},"Potasio cloruro|Remifentanilo":{"A":"IC"},"Potasio cloruro|Verapamilo":{"A":"C"},"Propofol|Remifentanilo":{"A":"I"},"Propofol|Vecuronio":{"A":"I"},"Propofol|Verapamilo":{"A":"C"},"Albúmina|Lorazepam":{"U":["C","Albúmina"]},"Albúmina|Furosemida":{"U":["C","Albúmina"]},"Amikacina|Amobarbital":{"U":["C","Amikacina"]},"Amikacina|Ácido ascórbico":{"U":["C","Amikacina"]},"Amikacina|Cefepime":{"U":["C","Cefepime"]},"Amikacina|Ceftriaxona":{"U":["C","Ceftriaxona"]},"Amikacina|Cloranfenicol":{"U":["C","Amikacina"]},"Amikacina|Ciprofloxacino":{"U":["C","Ciprofloxacino"]},"Amikacina|Cimetidina":{"U":["C","Amikacina"]},"Amikacina|Clindamicina":{"U":["C","Clindamicina"]},"Amikacina|Difenhidramina":{"U":["C","Amikacina"]},"Amikacina|Fluconazol":{"U":["C","Amikacina"]},"Amikacina|Furosemida":{"U":["C","Furosemida"]},"Amikacina|Hidrocortisona":{"U":["C","Amikacina"]},"Amikacina|Metronidazol":{"U":["C","Amikacina"]},"Amikacina|Fenobarbital":{"U":["C","Amikacina"]},"Amikacina|Ranitidina":{"U":["C","Amikacina"]},"Amikacina|Vancomicina":{"U":["C","Amikacina"]},"Amikacina|Verapamilo":{"U":["C","Amikacina"]},"Alopurinol|Aminofilina":{"U":["C","Aminofilina"]},"Aminofilina|Anfotericina B":{"U":["C","Aminofilina"]},"Aminofilina|Ceftazidima":{"U":["C","Aminofilina"]},"Aminofilina|Cimetidina":{"U":["C","Aminofilina"]},"Aminofilina|Fluconazol":{"U":["C","Aminofilina"]},"Aminofilina|Heparina sódica":{"U":["C","Aminofilina"]},"Aminofilina|Meropenem":{"U":["C","Aminofilina"]},"Aminofilina|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Aminofilina|Potasio cloruro":{"U":["C","Aminofilina"]},"Aminofilina|Ranitidina":{"U":["C","Ranitidina"]},"Amikacina|Amiodarona":{"U":["C","Amiodarona"]},"Amiodarona|Anfotericina B":{"U":["C","Amiodarona"]},"Amiodarona|Ceftriaxona":{"U":["C","Amiodarona"]},"Amiodarona|Cefuroxima":{"U":["C","Amiodarona"]},"Amiodarona|Ciprofloxacino":{"U":["C","Amiodarona"]},"Amiodarona|Claritromicina":{"U":["C","Amiodarona"]},"Amiodarona|Clindamicina":{"U":["C","Clindamicina"]},"Amiodarona|Fluconazol":{"U":["C","Amiodarona"]},"Amiodarona|Metilprednisolona":{"U":["C","Amiodarona"]},"Amiodarona|Metronidazol":{"U":["C","Amiodarona"]},"Amiodarona|Penicilina G potásica":{"U":["C","Amiodarona"]},"Amiodarona|Vancomicina":{"U":["C","Amiodarona"]},"Alopurinol|Buprenorfina":{"U":["C","Buprenorfina"]},"Buprenorfina|Gatifloxacino":{"U":["C","Buprenorfina"]},"Buprenorfina|Cefepime":{"U":["C","Buprenorfina"]},"Buprenorfina|Filgrastim":{"U":["C","Buprenorfina"]},"Buprenorfina|Propofol":{"U":["C","Buprenorfina"]},"Buprenorfina|Piperacilina":{"U":["C","Buprenorfina"]},"Butilhioscina|Cimetidina":{"U":["C","Butilhioscina"]},"Butilhioscina|Difenhidramina":{"U":["C","Butilhioscina"]},"Butilhioscina|Metoclopramida":{"U":["C","Butilhioscina"]},"Butilhioscina|Midazolam":{"U":["C","Butilhioscina"]},"Butilhioscina|Nalbufina":{"U":["C","Butilhioscina"]},"Butilhioscina|Ranitidina":{"U":["C","Butilhioscina"]},"Butilhioscina|Pentobarbital":{"U":["C","Butilhioscina"]},"Cefepime|Clindamicina":{"U":["C","Clindamicina"]},"Cefepime|Heparina sódica":{"U":["C","Cefepime"]},"Cefepime|Teofilina":{"U":["C","Cefepime"]},"Cefepime|Vancomicina":{"U":["C","Cefepime"],"M":"I"},"Cefepime|Potasio cloruro":{"U":["C","Cefepime"]},"Cefotaxima|Clindamicina":{"U":["C","Clindamicina"]},"Cefotaxima|Metronidazol":{"U":["C","Cefotaxima"]},"Cefotaxima|Verapamilo":{"U":["C","Cefotaxima"]},"Ceftazidima|Ciprofloxacino":{"U":["C","Ciprofloxacino"]},"Ceftazidima|Clindamicina":{"U":["C","Clindamicina"]},"Ceftazidima|Metronidazol":{"U":["C","Ceftazidima"]},"Ceftazidima|Ofloxacino":{"U":["C","Ceftazidima"]},"Ceftriaxona|Metronidazol":{"U":["C","Ceftriaxona"]},"Cimetidina|Ciprofloxacino":{"U":["C","Ciprofloxacino"]},"Ciprofloxacino|Dobutamina":{"U":["C","Dobutamina"]},"Ciprofloxacino|Dopamina":{"U":["C","Dopamina"]},"Ciprofloxacino|Fluconazol":{"U":["C","Ciprofloxacino"]},"Ciprofloxacino|Metronidazol":{"U":["C","Ciprofloxacino"]},"Ciprofloxacino|Midazolam":{"U":["C","Ciprofloxacino"]},"Ciprofloxacino|Potasio cloruro":{"U":["C","Ciprofloxacino"]},"Ciprofloxacino|Ranitidina":{"U":["C","Ranitidina"]},"Ampicilina|Clindamicina":{"U":["C","Clindamicina"]},"Clindamicina|Metilprednisolona":{"U":["C","Clindamicina"]},"Clindamicina|Metoclopramida":{"U":["C","Clindamicina"]},"Cefazolina|Clindamicina":{"U":["C","Clindamicina"]},"Cefuroxima|Clindamicina":{"U":["C","Clindamicina"]},"Cimetidina|Clindamicina":{"U":["C","Clindamicina"]},"Clindamicina|Fluconazol":{"U":["C","Clindamicina"]},"Clindamicina|Heparina sódica":{"U":["C","Clindamicina"]},"Clindamicina|Hidrocortisona":{"U":["C","Clindamicina"]},"Clindamicina|Metronidazol":{"U":["C","Clindamicina"]},"Clindamicina|Ofloxacino":{"U":["C","Clindamicina"]},"Clindamicina|Potasio cloruro":{"U":["C","Clindamicina"]},"Aminofilina|Dexametasona":{"U":["C","Dexametasona"]},"Dexametasona|Furosemida":{"U":["C","Dexametasona"]},"Dexametasona|Meropenem":{"U":["C","Meropenem"]},"Dexametasona|Ranitidina":{"U":["C","Dexametasona"]},"Dexametasona|Metoclopramida":{"U":["C","Dexametasona"]},"Cimetidina|Dexametasona":{"U":["C","Dexametasona"]},"Dexametasona|Ondansetrón":{"U":["C","Ondansetrón"]},"Fenitoína|Fluconazol":{"U":["C","Fenitoína"]},"Fenitoína|Tacrolimus":{"U":["C","Fenitoína"]},"Claritromicina|Dobutamina":{"U":["C","Dobutamina"]},"Diazepam|Dobutamina":{"U":["C","Dobutamina"]},"Dobutamina|Fluconazol":{"U":["C","Dobutamina"]},"Dobutamina|Haloperidol":{"U":["C","Haloperidol"]},"Dobutamina|Levofloxacino":{"U":["C","Levofloxacino"]},"Dobutamina|Ranitidina":{"U":["C","Ranitidina"]},"Dobutamina|Tacrolimus":{"U":["C","Dobutamina"]},"Dobutamina|Teofilina":{"U":["C","Dobutamina"]},"Dobutamina|Zidovudina":{"U":["C","Dobutamina"]},"Claritromicina|Dopamina":{"U":["C","Dopamina"]},"Dopamina|Fluconazol":{"U":["C","Dopamina"]},"Cefepime|Furosemida":{"U":["C","Furosemida"]},"Furosemida|Indometacina":{"U":["C","Furosemida"]},"Furosemida|Meropenem":{"U":["C","Meropenem"]},"Furosemida|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Furosemida|Ranitidina":{"U":["C","Ranitidina"]},"Dopamina|Haloperidol":{"U":["C","Haloperidol"]},"Fentanilo|Haloperidol":{"U":["C","Haloperidol"]},"Gatifloxacino|Haloperidol":{"U":["C","Haloperidol"]},"Haloperidol|Noradrenalina":{"U":["C","Haloperidol"]},"Haloperidol|Propofol":{"U":["C","Haloperidol"]},"Haloperidol|Teofilina":{"U":["C","Haloperidol"]},"Aciclovir|Imipenem":{"U":["C","Imipenem"]},"Cefepime|Imipenem":{"U":["C","Imipenem"]},"Imipenem|Ondansetrón":{"U":["C","Imipenem"]},"Imipenem|Propofol":{"U":["C","Imipenem"]},"Imipenem|Tacrolimus":{"U":["C","Imipenem"]},"Imipenem|Zidovudina":{"U":["C","Imipenem"]},"Dinitrato de isosorbida|Furosemida":{"U":["C","Dinitrato de isosorbida"]},"Fentanilo|Ketorolaco":{"U":["C","Ketorolaco"]},"Ketorolaco|Morfina cloruro":{"U":["C","Ketorolaco"]},"Amikacina|Levofloxacino":{"U":["C","Levofloxacino"]},"Ampicilina|Levofloxacino":{"U":["C","Levofloxacino"]},"Cefotaxima|Levofloxacino":{"U":["C","Levofloxacino"]},"Clindamicina|Levofloxacino":{"U":["C","Levofloxacino"]},"Dexametasona|Levofloxacino":{"U":["C","Levofloxacino"]},"Dopamina|Levofloxacino":{"U":["C","Levofloxacino"]},"Fentanilo|Levofloxacino":{"U":["C","Levofloxacino"]},"Gentamicina|Levofloxacino":{"U":["C","Levofloxacino"]},"Levofloxacino|Lorazepam":{"U":["C","Levofloxacino"]},"Levofloxacino|Metoclopramida":{"U":["C","Metoclopramida"]},"Levofloxacino|Penicilina G":{"U":["C","Levofloxacino"]},"Fenobarbital|Levofloxacino":{"U":["C","Levofloxacino"]},"Bicarbonato sódico|Levofloxacino":{"U":["C","Levofloxacino"]},"Levofloxacino|Vancomicina":{"U":["C","Vancomicina"]},"Digoxina|Meropenem":{"U":["C","Meropenem"]},"Enalaprilato|Meropenem":{"U":["C","Meropenem"]},"Fluconazol|Meropenem":{"U":["C","Meropenem"]},"Gentamicina|Meropenem":{"U":["C","Meropenem"]},"Heparina sódica|Meropenem":{"U":["C","Meropenem"]},"Insulina|Meropenem":{"U":["C","Meropenem"]},"Meropenem|Metoclopramida":{"U":["C","Metoclopramida"]},"Meropenem|Morfina cloruro":{"U":["C","Meropenem"]},"Fenobarbital|Meropenem":{"U":["C","Meropenem"]},"Meropenem|Vancomicina":{"U":["C","Vancomicina"]},"Aciclovir|Metoclopramida":{"U":["C","Metoclopramida"]},"Ciprofloxacino|Metoclopramida":{"U":["C","Metoclopramida"]},"Claritromicina|Metoclopramida":{"U":["C","Metoclopramida"]},"Fentanilo|Metoclopramida":{"U":["C","Metoclopramida"]},"Fluconazol|Metoclopramida":{"U":["C","Metoclopramida"]},"Metoclopramida|Ondansetrón":{"U":["C","Metoclopramida"]},"Metoclopramida|Piperacilina-tazobactam":{"U":["C","Metoclopramida"]},"Cefepime|Metronidazol":{"U":["C","Metronidazol"]},"Aciclovir|Metronidazol":{"U":["C","Metronidazol"]},"Claritromicina|Metronidazol":{"U":["C","Metronidazol"]},"Gatifloxacino|Metronidazol":{"U":["C","Metronidazol"]},"Metronidazol|Piperacilina":{"U":["C","Metronidazol"]},"Magnesio sulfato|Metronidazol":{"U":["C","Metronidazol"]},"Metilprednisolona|Metronidazol":{"U":["C","Metronidazol"]},"Heparina sódica|Metronidazol":{"U":["C","Metronidazol"]},"Amikacina|Midazolam":{"U":["C","Midazolam"]},"Clindamicina|Midazolam":{"U":["C","Midazolam"]},"Digoxina|Midazolam":{"U":["C","Midazolam"]},"Eritromicina|Midazolam":{"U":["C","Midazolam"]},"Gatifloxacino|Midazolam":{"U":["C","Midazolam"]},"Gentamicina|Midazolam":{"U":["C","Midazolam"]},"Haloperidol|Midazolam":{"U":["C","Midazolam"]},"Lorazepam|Midazolam":{"U":["C","Midazolam"]},"Metilprednisolona|Midazolam":{"U":["C","Midazolam"]},"Metronidazol|Midazolam":{"U":["C","Midazolam"]},"Midazolam|Ranitidina":{"U":["C","Ranitidina"]},"Metoclopramida|Midazolam":{"U":["C","Midazolam"]},"Midazolam|Nalbufina":{"U":["C","Midazolam"]},"Fluconazol|Midazolam":{"U":["C","Midazolam"]},"Etopósido|Nalbufina":{"U":["C","Nalbufina"]},"Filgrastim|Nalbufina":{"U":["C","Nalbufina"]},"Gatifloxacino|Nalbufina":{"U":["C","Nalbufina"]},"Nalbufina|Propofol":{"U":["C","Nalbufina"]},"Nalbufina|Remifentanilo":{"U":["C","Nalbufina"]},"Amikacina|Ondansetrón":{"U":["C","Ondansetrón"]},"Cisplatino|Ondansetrón":{"U":["C","Ondansetrón"]},"Cefotaxima|Ondansetrón":{"U":["C","Ondansetrón"]},"Cefuroxima|Ondansetrón":{"U":["C","Ondansetrón"]},"Ciclofosfamida|Ondansetrón":{"U":["C","Ondansetrón"]},"Dopamina|Ondansetrón":{"U":["C","Ondansetrón"]},"Dobutamina|Ondansetrón":{"U":["C","Ondansetrón"]},"Filgrastim|Ondansetrón":{"U":["C","Ondansetrón"]},"Gatifloxacino|Ondansetrón":{"U":["C","Ondansetrón"]},"Gentamicina|Ondansetrón":{"U":["C","Ondansetrón"]},"Haloperidol|Ondansetrón":{"U":["C","Ondansetrón"]},"Hidrocortisona|Ondansetrón":{"U":["C","Ondansetrón"]},"Difenhidramina|Ondansetrón":{"U":["C","Ondansetrón"]},"Droperidol|Ondansetrón":{"U":["C","Ondansetrón"]},"Buprenorfina|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Calcio gluconato|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Cefepime|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Metilprednisolona|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Clindamicina|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Fluconazol|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Dexametasona|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Hidrocortisona|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Manitol|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Metronidazol|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Morfina cloruro|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Lorazepam|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Meperidina|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Piperacilina-tazobactam|Ranitidina":{"U":["C","Piperacilina-tazobactam"]},"Piperacilina-tazobactam|Zidovudina":{"U":["C","Piperacilina-tazobactam"]},"Dopamina|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Magnesio sulfato|Piperacilina-tazobactam":{"U":["C","Piperacilina-tazobactam"]},"Aciclovir|Ranitidina":{"U":["C","Ranitidina"]},"Cefotaxima|Ranitidina":{"U":["C","Ranitidina"]},"Ceftazidima|Ranitidina":{"U":["C","Ranitidina"]},"Dopamina|Ranitidina":{"U":["C","Ranitidina"]},"Etopósido|Ranitidina":{"U":["C","Ranitidina"]},"Adrenalina|Ranitidina":{"U":["C","Ranitidina"]},"Fluconazol|Ranitidina":{"U":["C","Ranitidina"]},"Gatifloxacino|Ranitidina":{"U":["C","Ranitidina"]},"Filgrastim|Ranitidina":{"U":["C","Ranitidina"]},"Meperidina|Ranitidina":{"U":["C","Ranitidina"]},"Morfina cloruro|Ranitidina":{"U":["C","Ranitidina"]},"Ondansetrón|Ranitidina":{"U":["C","Ranitidina"]},"Piperacilina|Ranitidina":{"U":["C","Ranitidina"]},"Lorazepam|Ranitidina":{"U":["C","Ranitidina"]},"Aciclovir|Trimetoprim-sulfametoxazol":{"U":["C","Trimetoprim-sulfametoxazol"]},"Alopurinol|Trimetoprim-sulfametoxazol":{"U":["C","Trimetoprim-sulfametoxazol"]},"Cefepime|Trimetoprim-sulfametoxazol":{"U":["C","Trimetoprim-sulfametoxazol"]},"Lorazepam|Trimetoprim-sulfametoxazol":{"U":["C","Trimetoprim-sulfametoxazol"]},"Trimetoprim-sulfametoxazol|Vecuronio":{"U":["C","Trimetoprim-sulfametoxazol"]},"Trimetoprim-sulfametoxazol|Zidovudina":{"U":["C","Trimetoprim-sulfametoxazol"]},"Magnesio sulfato|Trimetoprim-sulfametoxazol":{"U":["C","Trimetoprim-sulfametoxazol"]},"Morfina cloruro|Trimetoprim-sulfametoxazol":{"U":["C","Trimetoprim-sulfametoxazol"]},"Piperacilina|Trimetoprim-sulfametoxazol":{"U":["C","Trimetoprim-sulfametoxazol"]},"Aciclovir|Vancomicina":{"U":["C","Vancomicina"]},"Alopurinol|Vancomicina":{"U":["C","Vancomicina"]},"Claritromicina|Vancomicina":{"U":["C","Vancomicina"]},"Etopósido|Vancomicina":{"U":["C","Vancomicina"]},"Filgrastim|Vancomicina":{"U":["C","Vancomicina"]},"Fluconazol|Vancomicina":{"U":["C","Vancomicina"]},"Insulina|Vancomicina":{"U":["C","Vancomicina"]},"Lorazepam|Vancomicina":{"U":["C","Vancomicina"]},"Magnesio sulfato|Vancomicina":{"U":["C","Vancomicina"]},"Meperidina|Vancomicina":{"U":["C","Vancomicina"]},"Ondansetrón|Vancomicina":{"U":["C","Vancomicina"]},"Vancomicina|Vecuronio":{"U":["C","Vancomicina"]},"Bicarbonato sódico|Vancomicina":{"U":["C","Vancomicina"]},"Vancomicina|Zidovudina":{"U":["C","Vancomicina"]},"Hidrocortisona|Midazolam":{"M":"I"},"Cefepime|Midazolam":{"M":"I"},"Hidrocortisona|Vancomicina":{"M":"I"},"Omeprazol|Vancomicina":{"M":"I"},"Calcio cloruro|Hidrocortisona":{"M":"I"},"Midazolam|Omeprazol":{"M":"I"},"Fenitoína|Ranitidina":{"M":"I"},"Fenitoína|Midazolam":{"M":"I"},"Fenitoína|Noradrenalina":{"M":"I"},"Hidrocortisona|Tiamina (vitamina B1)":{"M":"I"},"Trimetoprim-sulfametoxazol|Vancomicina":{"M":"I"},"Fenitoína|Fentanilo":{"M":"I"},"Fentanilo|Trimetoprim-sulfametoxazol":{"M":"I"},"Hidrocortisona|Trimetoprim-sulfametoxazol":{"M":"I"},"Ranitidina|Trimetoprim-sulfametoxazol":{"M":"I"}},"t2":{"Adrenalina|Pantoprazol":{"Adrenalina":0.032,"Pantoprazol":0.8},"Adrenalina|Verapamilo":{"Adrenalina":0.002,"Verapamilo":0.08},"Amiodarona|Fenilefrina":{"Amiodarona":4,"Fenilefrina":0.04},"Amiodarona|Furosemida":{"Amiodarona":6,"Furosemida":1},"Amiodarona|Nitroprusiato":{"Amiodarona":15,"Nitroprusiato":0.3},"Calcio cloruro|Dobutamina":{"Calcio cloruro":4,"Dobutamina":4},"Calcio gluconato|Dobutamina":{"Calcio gluconato":4,"Dobutamina":4},"Ceftazidima|Dobutamina":{"Ceftazidima":120,"Dobutamina":1},"Ceftazidima|Dopamina":{"Ceftazidima":120,"Dopamina":0.4},"Ceftazidima|Ketamina":{"Ceftazidima":125,"Ketamina":10},"Dobutamina|Heparina sódica":{"Dobutamina":1,"Heparina sódica":50},"Dobutamina|Magnesio sulfato":{"Dobutamina":4,"Magnesio sulfato":40},"Dobutamina|Potasio cloruro":{"Dobutamina":4,"Potasio cloruro":0.06},"Dopamina|Midazolam":{"Dopamina":3.2,"Midazolam":2},"Fentanilo|Remifentanilo":{"Fentanilo":0.0125,"Remifentanilo":0.25},"Heparina sódica|Verapamilo":{"Heparina sódica":20,"Verapamilo":0.08},"Isoproterenol|Magnesio sulfato":{"Isoproterenol":0.004,"Magnesio sulfato":1},"Isoproterenol|Potasio cloruro":{"Isoproterenol":0.2,"Potasio cloruro":0.04},"Isoproterenol|Vecuronio":{"Isoproterenol":0.004,"Vecuronio":0.1},"Isoproterenol|Verapamilo":{"Isoproterenol":0.01,"Verapamilo":0.08},"Meropenem|Potasio cloruro":{"Meropenem":22,"Potasio cloruro":0.04},"Naloxona|Verapamilo":{"Naloxona":0.0008,"Verapamilo":0.08},"Nitroglicerina|Verapamilo":{"Nitroglicerina":0.1,"Verapamilo":0.08},"Nitroprusiato|Vecuronio":{"Nitroprusiato":0.2,"Vecuronio":0.1},"Nitroprusiato|Verapamilo":{"Nitroprusiato":0.1,"Verapamilo":0.08},"Noradrenalina|Verapamilo":{"Noradrenalina":0.008,"Verapamilo":0.08},"Dexmedetomidina|Piperacilina-tazobactam":{"Piperacilina-tazobactam":40,"Dexmedetomidina":0.004},"Piperacilina-tazobactam|Remifentanilo":{"Piperacilina-tazobactam":40,"Remifentanilo":0.25},"Potasio cloruro|Remifentanilo":{"Potasio cloruro":0.1,"Remifentanilo":0.25}}};
+const DRUGS = DATA.drugs, PAIRS = DATA.pairs, T2 = DATA.t2;
+const NAMES = Object.keys(DRUGS).sort((a,b)=>a.localeCompare(b,'es'));
+
+/* ---------- Utilidades ---------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const pkey = (a,b)=>[a,b].sort().join('|');
+const num = v => { if(v===''||v==null) return null; const x=parseFloat(String(v).replace(',','.')); return isFinite(x)?x:null; };
+let uid = 1; const nid = p => p + (uid++);
+function fmt(x){ if(x==null||!isFinite(x)) return '—'; const a=Math.abs(x);
+  const d = a===0?0: a>=100?0: a>=10?1: a>=1?2: a>=0.1?3: a>=0.01?4:5;
+  return x.toLocaleString('es-ES',{maximumFractionDigits:d}); }
+const ORDER = {NONE:-1,C:0,COND:1,ND:2,I:3};
+const worse = (a,b)=> ORDER[a]>=ORDER[b]?a:b;
+const ST_LABEL = {C:'Compatible',COND:'Condicional',I:'Incompatible',ND:'Sin datos',NONE:'Sin evaluar'};
+const pill = (st,txt)=>`<span class="pill st-${st}">${esc(txt||ST_LABEL[st])}</span>`;
+const SRC_MI = 'Med Intensiva 2020 (Castells Lao et al., fig. 2)';
+const SRC_UN = 'Guía UNAM 2010';
+const SRC_MX = 'Micromedex, en Marsilio et al. Rev Bras Ter Intensiva 2016';
+
+/* Alias de búsqueda (nombres genéricos alternativos y marcas habituales en España) */
+const ALIAS = {
+ 'Adrenalina':'epinefrina','Noradrenalina':'norepinefrina','Morfina cloruro':'morfina cloruro morfico','Heparina sódica':'heparina',
+ 'Potasio cloruro':'kcl cloruro potasico cloruro de potasio','Bicarbonato sódico':'bicarbonato de sodio 1m','Magnesio sulfato':'sulfato de magnesio sulmetin',
+ 'Calcio gluconato':'gluconato calcico gluconato de calcio','Calcio cloruro':'cloruro calcico cloruro de calcio',
+ 'Isoproterenol':'isoprenalina aleudrina','N-acetilcisteína':'acetilcisteina','Piperacilina-tazobactam':'tazocel piperacilina tazobactam',
+ 'Trimetoprim-sulfametoxazol':'cotrimoxazol septrin tmp smx','Metamizol':'nolotil dipirona','Ondansetrón':'zofran','Furosemida':'seguril',
+ 'Amiodarona':'trangorex','Midazolam':'dormicum','Propofol':'diprivan','Remifentanilo':'ultiva','Dexmedetomidina':'dexdor',
+ 'Cisatracurio':'nimbex','Nitroglicerina':'solinitrina','Labetalol':'trandate','Clonidina':'catapresan','Flumazenilo':'anexate',
+ 'Ketamina':'ketolar','Metoclopramida':'primperan','Butilhioscina':'buscapina escopolamina butilbromuro','Ketorolaco':'toradol',
+ 'Diclofenaco':'voltaren','Enoxaparina':'clexane','Dexametasona':'fortecortin','Meropenem':'meronem','Imipenem':'tienam',
+ 'Levofloxacino':'tavanic','Ceftazidima':'fortam','Ceftriaxona':'rocefalin','Clindamicina':'dalacin','Insulina':'insulina regular rapida actrapid',
+ 'Dinitrato de isosorbida':'isosorbide','Esomeprazol':'nexium','Albúmina':'albumina','Nutrición parenteral NO lipídica':'npt nutricion parenteral sin lipidos',
+ 'Nutrición parenteral lipídica':'npt nutricion parenteral con lipidos','Tiamina (vitamina B1)':'tiamina vitamina b1 benerva','Hidrocortisona':'actocortina','Fenitoína':'difenilhidantoina epanutin','Vancomicina':'vancomicina','Cefepime':'maxipime','Milrinona':'corotrope','Vecuronio':'norcuron','Naloxona':'naloxona','Somatostatina':'somiaton'
+};
+
+/* Dimensión de cada fármaco: masa (mg), UI, mEq o solo volumen */
+const DIM = {'Heparina sódica':'ui','Insulina':'ui','Penicilina G':'ui','Penicilina G potásica':'ui','Potasio cloruro':'meq','Bicarbonato sódico':'meq',
+  'Nutrición parenteral NO lipídica':'vol','Nutrición parenteral lipídica':'vol','Multivitaminas':'vol'};
+const dimOf = d => DIM[d]||'mass';
+const AMT = { mass:{g:1000,mg:1,mcg:0.001,ng:1e-6}, ui:{UI:1,MUI:1e6}, meq:{mEq:1,mmol:1} };
+const BASE = { mass:'mg', ui:'UI', meq:'mEq' };
+
+/* Límites que figuran en la Guía UNAM 2010 (columna Velocidad de infusión) */
+const LIMITS = {
+  'Dobutamina':{dose:[2,20,'mcg/kg/min'],txt:'Habitualmente 2-20 mcg/kg/min'},
+  'Dopamina':{dose:[null,20,'mcg/kg/min'],txt:'Mantenimiento habitual ≤20 mcg/kg/min'},
+  'Furosemida':{mgmin:4,txt:'En infusión no exceder 4 mg/min'},
+  'Vancomicina':{mgmin:10,conc:5,txt:'No más de 5 mg/mL ni 10 mg/min'},
+  'Fenitoína':{mgmin:50,txt:'No exceder 50 mg/min en adultos'},
+  'Amiodarona':{mgmin:15,txt:'Carga rápida máx. 15 mg/min'},
+  'Aminofilina':{mgmin:20,txt:'20 mg/min'},
+  'Ceftriaxona':{mgmin:50,txt:'50 mg/min'},
+  'Ketorolaco':{mgmin:3,txt:'IV directa 3 mg/min'},
+  'Diclofenaco':{mgmin:2,txt:'2 mg/min'},
+  'Imipenem':{conc:5,txt:'Concentración ≤5 mg/mL'},
+  'Levofloxacino':{conc:5,txt:'Solo a 5 mg/mL'},
+  'Ciprofloxacino':{conc:2,txt:'1-2 mg/mL'},
+  'Metamizol':{mlmin:1,txt:'No más de 1 mL/min'}
+};
+
+/* Reglas por constantes (farmacología clínica general) */
+const G = {
+  hypo:['Nitroglicerina','Nitroprusiato','Labetalol','Diltiazem','Verapamilo','Propofol','Dexmedetomidina','Clonidina','Morfina cloruro','Fentanilo','Remifentanilo','Midazolam','Milrinona','Furosemida','Dinitrato de isosorbida','Amiodarona','Metamizol','Levofloxacino','Haloperidol','Metadona','Meperidina','Hidromorfona','Lorazepam','Diazepam','Propranolol','Enalaprilato'],
+  vasop:['Noradrenalina','Adrenalina','Fenilefrina','Dopamina'],
+  brady:['Dexmedetomidina','Clonidina','Verapamilo','Diltiazem','Labetalol','Amiodarona','Remifentanilo','Propofol','Propranolol','Digoxina'],
+  tachy:['Adrenalina','Dopamina','Dobutamina','Isoproterenol','Aminofilina','Teofilina','Milrinona'],
+  resp:['Morfina cloruro','Fentanilo','Remifentanilo','Midazolam','Propofol','Metadona','Meperidina','Hidromorfona','Buprenorfina','Nalbufina','Lorazepam','Diazepam','Fenobarbital','Pentobarbital','Amobarbital','Ketamina','Cisatracurio','Vecuronio'],
+  renal:['Vancomicina','Amikacina','Gentamicina','Tobramicina','Meropenem','Imipenem','Ceftazidima','Cefepime','Cefotaxima','Cefazolina','Cefuroxima','Piperacilina-tazobactam','Piperacilina','Ampicilina','Levofloxacino','Ciprofloxacino','Ofloxacino','Gatifloxacino','Enoxaparina','Milrinona','Trimetoprim-sulfametoxazol','Ranitidina','Cimetidina','Aciclovir','Fluconazol','Digoxina','Magnesio sulfato','Potasio cloruro','Morfina cloruro','Metoclopramida','Zidovudina','Argatroban'],
+  nsaid:['Ketorolaco','Diclofenaco','Metamizol','Clonixinato de lisina','Indometacina'],
+  kdown:['Furosemida','Insulina','Bicarbonato sódico','Anfotericina B'],
+};
+
+/* ---------- Estado ---------- */
+const newQ = (o={}) => Object.assign({drug:'',dil:'',dilp:'',dilo:'',cm:'per',conc:'',cu:'',camt:'',camu:'',cvol:'',cpct:''},o);
+const state = { qpt:{}, view:'rapida', prevView:'rapida', drugSel:'Noradrenalina',
+  quick:[newQ({drug:'Noradrenalina',dil:'G',dilp:'5'}),newQ({drug:'Midazolam',dil:'G',dilp:'5'}),newQ()] };
+
+function dilCheck(it){
+  const u=DRUGS[it.drug]?.u; if(!u||!it.dil||['none','otro','PL','API'].includes(it.dil)) return [];
+  const s=u.dil; if(/no mezclar|proveedor/i.test(s)) return []; const p=dilPct(it);
+  const ok = it.dil==='SF' ? (/SF/.test(s) && (p==='0,9'||!p)) : it.dil==='G' ? (p==='5'? /Dx 5/.test(s) : p==='10'? /Dx 5%?,? ?10|10%/.test(s) : false) : it.dil==='GS' ? /mixta|en SF|en cloruro/i.test(s) : it.dil==='RL' ? /Ringer|Hartmann/i.test(s) : true;
+  return ok?[]:[{bad:true,t:`Diluyente no recogido en la guía para ${it.drug}. Diluyentes indicados: ${s}.`,s:SRC_UN}];
+}
+
+/* ---------- Compatibilidad de una pareja ---------- */
+const DIL_TYPES = {
+  '':{l:'Diluyente…'},
+  SF:{l:'Suero fisiológico (NaCl)',s:'SF',p:['0,9','0,45','3','otro']},
+  G:{l:'Glucosado',s:'Glucosado',p:['5','10','20','50','otro']},
+  GS:{l:'Glucosalino',s:'Glucosalino',p:['5/0,9','5/0,45','3,3/0,3','otro']},
+  RL:{l:'Ringer lactato / Hartmann',s:'Ringer lactato'},
+  PL:{l:'Plasma-Lyte / sol. balanceada',s:'Plasma-Lyte'},
+  API:{l:'Agua para inyección',s:'Agua PPI'},
+  otro:{l:'Otro',s:'Otro'},
+  none:{l:'Sin diluir',s:'sin diluir'}
+};
+function legacyDil(x){ if(x.dil==='G5'){ x.dil='G'; x.dilp='5'; } else if(x.dil==='SF' && !x.dilp){ x.dilp='0,9'; } return x; }
+function dilPct(x){ const T=DIL_TYPES[x.dil]; if(!T||!T.p) return ''; const p=x.dilp||T.p[0]; return p==='otro' ? String(x.dilo||'').replace('.',',').replace('%','').trim() : p; }
+function dilLabel(x){ if(!x.dil) return 'no indicado'; const T=DIL_TYPES[x.dil]||{s:x.dil}; if(x.dil==='otro') return x.dilo?('otro: '+x.dilo):'otro'; const p=dilPct(x); return T.s+(p?' '+p+'%':''); }
+/* need: 'G5' o 'SF09'. Devuelve ok | pct (mismo tipo, otro %) | bad (otro tipo) | unknown */
+function dilState(x,need){ if(!x.dil||x.dil==='none') return 'unknown'; const p=dilPct(x);
+  if(need==='G5') return x.dil==='G' ? (p==='5'?'ok':(p?'pct':'unknown')) : (x.dil==='otro'?'unknown':'bad');
+  if(need==='SF09') return x.dil==='SF' ? (p==='0,9'?'ok':(p?'pct':'unknown')) : (x.dil==='otro'?'unknown':'bad');
+  return 'unknown'; }
+function concText(drug,c){ const d=dimOf(drug); if(d==='mass') return c<0.1?`${fmt(c*1000)} mcg/mL`:`${fmt(c)} mg/mL`; return `${fmt(c)} ${BASE[d]}/mL`; }
+function evalPair(A,B){
+  const da=DRUGS[A.drug]||{}, db=DRUGS[B.drug]||{};
+  if(A.drug===B.drug) return {st:'COND',msgs:['El mismo fármaco aparece dos veces en esta luz. Revise si es un error.'],src:[]};
+  if(da.nomix||db.nomix){ const n=da.nomix?A.drug:B.drug; return {st:'I',msgs:[`La guía indica «No mezclar» para ${n}: administrar por una luz exclusiva.`],src:[SRC_UN]}; }
+  const k=pkey(A.drug,B.drug), p=PAIRS[k];
+  if(!p) return {st:'ND',msgs:['Ninguna de las fuentes estudió esta pareja en Y. Trátela como no compatible y consulte Micromedex/Trissel o Farmacia.'],src:[]};
+  const src=[]; const msgs=[]; let st='C';
+  if(p.A) src.push(SRC_MI);
+  if(p.U) src.push(`${SRC_UN}, monografía de ${p.U[1]}`);
+  if(p.M) src.push(SRC_MX);
+  if(p.M==='I' && !(p.A && p.A.startsWith('I')))
+    return {st:'I',msgs:['Incompatible en Y según Micromedex.'+((p.U||(p.A&&p.A.startsWith('C')))?' Otra fuente la da como compatible; puede depender de la concentración. Prevalece el dato más restrictivo.':'')],src};
+  if(p.A){
+    const [base,dl] = p.A.split('_');
+    if(base==='I') return {st:'I',msgs:['Incompatible en Y según la revisión sistemática de UCI'+(p.M?' y Micromedex':'')+'.'+(p.U?' La guía UNAM la listaba como compatible; prevalece el dato más restrictivo.':'')],src};
+    if(dl){ const need=dl==='G'?'G5':'SF09', lab=dl==='G'?'glucosado 5%':'suero fisiológico 0,9%';
+      const sa=dilState(A,need), sb=dilState(B,need); const bad=[A,B].filter(x=>dilState(x,need)==='bad'); const pct=[A,B].filter(x=>dilState(x,need)==='pct');
+      if(sa==='ok' && sb==='ok') msgs.push(`Solo compatible con ambos diluidos en ${lab}: se cumple.`);
+      else if(bad.length){ st='I'; msgs.push(`Solo compatible si ambos van diluidos en ${lab}. ${bad.map(x=>x.drug+' está en '+dilLabel(x)).join('; ')}.`); }
+      else if(pct.length){ st=worse(st,'COND'); msgs.push(`Estudiado solo en ${lab}. No hay datos con ${pct.map(x=>x.drug+' en '+dilLabel(x)).join('; ')}.`); }
+      else { st=worse(st,'COND'); msgs.push(`Solo compatible si ambos van diluidos en ${lab}. Indique el diluyente de cada fármaco.`); }
+    }
+    if(base==='IC'){
+      const lim=T2[k]||{}; const la=lim[A.drug], lb=lim[B.drug];
+      const limTxt=`${A.drug} ≤ ${concText(A.drug,la)} y ${B.drug} ≤ ${concText(B.drug,lb)}`;
+      const over=[A,B].filter(x=>x.conc!=null && x.conc>lim[x.drug]*1.0001);
+      if(over.length){ st='I'; msgs.push(`Compatible solo a concentraciones bajas (${limTxt}). Se supera en: ${over.map(x=>x.drug+' '+concText(x.drug,x.conc)).join(', ')}.`); }
+      else if(A.conc!=null && B.conc!=null) msgs.push(`Compatible solo a concentraciones bajas (${limTxt}): se cumple.`);
+      else { st=worse(st,'COND'); msgs.push(`Compatible solo a concentraciones bajas (${limTxt}). Indique la concentración de ambos.`); }
+      if(p.U) msgs.push('La guía UNAM la lista como compatible sin condiciones; se aplica la condición más restrictiva.');
+    }
+    if(base==='C'){
+      for(const x of [A,B]){ const ref=DRUGS[x.drug]?.ref; if(ref && ref[0]!=null && x.conc!=null && x.conc>ref[0]*1.0001){ st=worse(st,'COND');
+        msgs.push(`${x.drug} a ${concText(x.drug,x.conc)} supera la concentración estudiada (${concText(x.drug,ref[0])}). El dato no se puede extrapolar.`);} }
+      if(!msgs.length) msgs.push(p.U?'Compatible en Y según ambas fuentes.':'Compatible en Y a las concentraciones estándar de UCI.');
+    }
+  } else {
+    msgs.push('Compatible en Y según la guía UNAM (lista de compatibles en Y).');
+  }
+  return {st,msgs,src};
+}
+
+/* ---------- Constantes y avisos ---------- */
+function fg(p=state.qpt){ if(num(p.fgman)!=null) return num(p.fgman);
+  const w=num(p.peso), e=num(p.edad), c=num(p.creat); if(!w||!e||!c) return null;
+  const mg = p.creatu==='umol'? c/88.4 : c; let v=((140-e)*w)/(72*mg); if(p.sexo==='M') v*=0.85; return v; }
+function vitalFlags(p=state.qpt){
+  const f={}; const tas=num(p.tas), tad=num(p.tad);
+  const tam = (tas!=null&&tad!=null)? (tas+2*tad)/3 : null;
+  f.hypo = (tas!=null&&tas<90)||(tam!=null&&tam<65); f.htn = tas!=null&&tas>180;
+  const fc=num(p.fc); f.brady=fc!=null&&fc<50; f.tachy=fc!=null&&fc>120;
+  const s=num(p.spo2), fr=num(p.fr); f.resp=(s!=null&&s<92)||(fr!=null&&fr<10);
+  const k=num(p.k); f.khigh=k!=null&&k>5; f.klow=k!=null&&k<3.5;
+  let g=num(p.gluc); if(g!=null&&p.glucu==='mmol') g*=18; f.hypog=g!=null&&g<70; f.hyperg=g!=null&&g>250;
+  const r=fg(p); f.renal=r!=null&&r<50; f.renal30=r!=null&&r<30; f.fg=r; f.tam=tam; f.glu=g;
+  return f;
+}
+function vitalAlerts(drug,p=state.qpt){
+  const f=vitalFlags(p), out=[], S='Regla general de farmacología clínica';
+  const has=(g)=>G[g].includes(drug);
+  if(f.hypo && has('hypo')) out.push({bad:true,t:`Hipotensión (TAS ${p.tas}${f.tam!=null?', TAM '+fmt(f.tam):''}): ${drug} puede bajar más la presión arterial. Valorar con el médico responsable.`,s:S});
+  if(f.htn && has('vasop')) out.push({bad:false,t:`TAS > 180 mmHg con un vasopresor (${drug}). Revisar objetivo de presión y dosis.`,s:S});
+  if(f.brady && has('brady')) out.push({bad:true,t:`Bradicardia (FC ${p.fc}): ${drug} puede reducir más la frecuencia cardiaca.`,s:S});
+  if(f.tachy && has('tachy')) out.push({bad:false,t:`Taquicardia (FC ${p.fc}): ${drug} puede aumentar la frecuencia cardiaca.`,s:S});
+  if(f.resp && has('resp')) out.push({bad:true,t:`SpO₂ < 92% o FR < 10: ${drug} puede producir depresión respiratoria. Vigilar ventilación.`,s:S});
+  if(f.khigh && drug==='Potasio cloruro') out.push({bad:true,t:`Potasio sérico ${p.k} mEq/L (> 5): revisar el aporte de potasio.`,s:S});
+  if(f.klow && has('kdown')) out.push({bad:false,t:`Potasio sérico ${p.k} mEq/L (< 3,5): ${drug} puede bajarlo más. Vigilar ionograma.`,s:S});
+  if(f.hypog && drug==='Insulina') out.push({bad:true,t:`Glucemia ${fmt(f.glu)} mg/dL (< 70) con insulina en perfusión.`,s:S});
+  if(f.renal && has('renal')) out.push({bad:false,t:`Función renal reducida (FG ${fmt(f.fg)} mL/min): ${drug} puede requerir ajuste de dosis o intervalo. Consultar Lexicomp/UpToDate o Farmacia.`,s:S});
+  if(f.renal30 && has('nsaid')) out.push({bad:true,t:`FG ${fmt(f.fg)} mL/min (< 30): evitar o valorar con cuidado ${drug} por riesgo de empeorar la función renal.`,s:S});
+  return out;
+}
+
+/* ---------- Controles comunes ---------- */
+function dilControls(pre,x,attr){ const T=DIL_TYPES[x.dil]||{}; const p=x.dilp||(T.p?T.p[0]:'');
+  let h=`<select id="${pre}-dil" ${attr}="dil" data-rerender="1" aria-label="Diluyente">${Object.entries(DIL_TYPES).map(([k,v])=>`<option value="${k}"${(x.dil||'')===k?' selected':''}>${v.l}</option>`).join('')}</select>`;
+  if(T.p) h+=`<select id="${pre}-dilp" ${attr}="dilp" data-rerender="1" aria-label="Concentración del diluyente">${T.p.map(o=>`<option value="${o}"${p===o?' selected':''}>${o==='otro'?'otro %':o+' %'}</option>`).join('')}</select>`;
+  if((T.p&&p==='otro')||x.dil==='otro') h+=`<input id="${pre}-dilo" ${attr}="dilo" value="${esc(x.dilo||'')}" placeholder="${x.dil==='otro'?'¿cuál?':'%'}" aria-label="Diluyente personalizado"${x.dil==='otro'?' style="width:9em"':''}>`;
+  return `<span class="dilrow">${h}</span>`; }
+function unitSel(id,f,dim,val){ const U=Object.keys(AMT[dim]||{}); if(!U.length) return ''; const v=val||BASE[dim]; return `<select id="${id}" data-f="${f}">${U.map(u=>`<option${u===v?' selected':''}>${u}</option>`).join('')}</select>`; }
+function inp(id,f,val,ph,w){ return `<input id="${id}" data-f="${f}" inputmode="decimal" value="${esc(val)}" placeholder="${ph||''}"${w?` style="width:${w}"`:''}>`; }
+function comboHTML(id,val,ph){ return `<div class="combo"><input id="${id}" data-combo="1" autocomplete="off" role="combobox" aria-expanded="false" aria-label="Fármaco" placeholder="${ph||'Escriba un fármaco…'}" value="${esc(val)}"></div>`; }
+
+/* ---------- Combobox de fármacos ---------- */
+let comboState=null;
+function matches(q){ const n=norm(q.trim()); if(!n) return NAMES.slice(0,60);
+  const sc=NAMES.map(d=>{ const a=norm(d), al=norm(ALIAS[d]||''); let s=-1; if(a.startsWith(n)) s=0; else if(a.includes(n)) s=1; else if(al.split(' ').some(w=>w.startsWith(n))) s=2; else if(al.includes(n)) s=3; return [d,s]; }).filter(x=>x[1]>=0);
+  sc.sort((x,y)=>x[1]-y[1]||x[0].localeCompare(y[0],'es')); return sc.slice(0,40).map(x=>x[0]); }
+function openCombo(input){
+  closeCombo(); const list=document.createElement('ul'); list.setAttribute('role','listbox'); input.parentNode.appendChild(list); input.setAttribute('aria-expanded','true');
+  comboState={input,list,idx:0,items:[]}; fillCombo();
+}
+function fillCombo(){ const s=comboState; if(!s) return; s.items=matches(s.input.value); s.idx=Math.min(s.idx,Math.max(0,s.items.length-1));
+  s.list.innerHTML = s.items.length? s.items.map((d,i)=>`<li role="option" data-v="${esc(d)}" aria-selected="${i===s.idx}"><span>${esc(d)}${ALIAS[d]?`<span class="alias">${esc(ALIAS[d])}</span>`:''}</span><small>${srcTags(d)}</small></li>`).join('') : '<li>Sin resultados. Pruebe con otro nombre o con la marca.</li>';
+  const sel=s.list.querySelector('[aria-selected="true"]'); sel&&sel.scrollIntoView({block:'nearest'}); }
+function srcTags(d){ const D=DRUGS[d]; const t=[]; if(D.icu) t.push('UCI'); if(D.u) t.push('Guía'); if(!t.length) t.push('pocos datos'); return t.join(' · '); }
+function closeCombo(){ if(comboState){ comboState.list.remove(); comboState.input.setAttribute('aria-expanded','false'); comboState=null; } }
+function pickDrug(input,d){
+  input.value=d; closeCombo();
+  const q=input.closest('[data-q]'); if(q){ const o=state.quick[+q.dataset.q]; if(o.drug!==d){ o.drug=d; o.cu=''; o.camu=''; } renderQuickOut(); }
+}
+document.addEventListener('input',e=>{ const t=e.target; if(t.dataset.combo){ if(!comboState||comboState.input!==t) openCombo(t); comboState.idx=0; fillCombo(); } });
+document.addEventListener('focusin',e=>{ if(e.target.dataset&&e.target.dataset.combo){ openCombo(e.target); } });
+document.addEventListener('keydown',e=>{ const s=comboState; if(!s||e.target!==s.input) return;
+  if(e.key==='ArrowDown'){ s.idx=Math.min(s.idx+1,s.items.length-1); fillCombo(); e.preventDefault(); }
+  else if(e.key==='ArrowUp'){ s.idx=Math.max(s.idx-1,0); fillCombo(); e.preventDefault(); }
+  else if(e.key==='Enter'){ if(s.items[s.idx]) pickDrug(s.input,s.items[s.idx]); e.preventDefault(); }
+  else if(e.key==='Escape'){ closeCombo(); } });
+document.addEventListener('mousedown',e=>{ const li=e.target.closest('.combo li[data-v]'); if(li){ e.preventDefault(); pickDrug(li.closest('.combo').querySelector('input'),li.dataset.v); } else if(!e.target.closest('.combo')) closeCombo(); });
+document.addEventListener('focusout',e=>{ if(e.target.dataset&&e.target.dataset.combo){ setTimeout(()=>{ if(comboState&&comboState.input===e.target&&document.activeElement!==e.target){
+  // si el texto coincide exactamente con un fármaco, se acepta
+  const exact=NAMES.find(d=>norm(d)===norm(e.target.value)); if(exact) pickDrug(e.target,exact); else closeCombo(); } },150); } });
+
+/* ---------- Constantes ---------- */
+const VITALS=[
+ {k:'peso',l:'Peso',u:'kg'},{k:'edad',l:'Edad',u:'años'},{k:'sexo',l:'Sexo',sel:[['','—'],['H','Hombre'],['M','Mujer']]},
+ {k:'tas',l:'TA sistólica',u:'mmHg',flag:v=>v<90?['bad','Hipotensión']:v>180?['warn','Muy elevada']:null},
+ {k:'tad',l:'TA diastólica',u:'mmHg'},
+ {k:'fc',l:'Frecuencia cardiaca',u:'lpm',flag:v=>v<50?['bad','Bradicardia']:v>120?['warn','Taquicardia']:null},
+ {k:'spo2',l:'SpO₂',u:'%',flag:v=>v<92?['bad','Baja']:null},
+ {k:'fr',l:'Frecuencia respiratoria',u:'rpm',flag:v=>v<10?['bad','Bradipnea']:v>30?['warn','Taquipnea']:null},
+ {k:'temp',l:'Temperatura',u:'°C',flag:v=>v>=38?['warn','Fiebre']:v<35?['bad','Hipotermia']:null},
+ {k:'gluc',l:'Glucemia',uk:'glucu',us:[['mgdl','mg/dL'],['mmol','mmol/L']]},
+ {k:'k',l:'Potasio (K⁺)',u:'mEq/L',flag:v=>v>5?['bad','Hiperpotasemia']:v<3.5?['warn','Hipopotasemia']:null},
+ {k:'na',l:'Sodio (Na⁺)',u:'mEq/L',flag:v=>v<130?['warn','Hiponatremia']:v>150?['warn','Hipernatremia']:null},
+ {k:'creat',l:'Creatinina',uk:'creatu',us:[['mgdl','mg/dL'],['umol','µmol/L']]},
+ {k:'fgman',l:'FG medido (opcional)',u:'mL/min'}
+];
+function vitalsHTML(p,attr,pre,list){
+  return list.map(v=>{
+    let ctl; if(v.sel) ctl=`<select id="${pre}-${v.k}" ${attr}="${v.k}">${v.sel.map(([a,b])=>`<option value="${a}"${(p[v.k]||'')===a?' selected':''}>${b}</option>`).join('')}</select>`;
+    else ctl=`<input id="${pre}-${v.k}" ${attr}="${v.k}" inputmode="decimal" value="${esc(p[v.k]||'')}">${v.us?`<select id="${pre}-${v.uk}" ${attr}="${v.uk}" aria-label="Unidad">${v.us.map(([a,b])=>`<option value="${a}"${(p[v.uk]||v.us[0][0])===a?' selected':''}>${b}</option>`).join('')}</select>`:`<span class="unit">${v.u||''}</span>`}`;
+    return `<div class="vital" data-vbox="${v.k}"><label for="${pre}-${v.k}">${v.l}</label><div class="vin">${ctl}</div><span class="flag" data-vflag="${v.k}"></span></div>`; }).join('')
+    + `<div class="vital"><label>Calculados</label><div class="num" data-vcalc="1" style="font-size:.95rem"></div></div>`;
+}
+const QVITALS_KEYS=['peso','edad','sexo','tas','tad','fc','spo2','fr','gluc','k','creat'];
+function renderQuickVitals(){ const box=$('#qvitals'); box.innerHTML=vitalsHTML(state.qpt,'data-qv','qv',VITALS.filter(v=>QVITALS_KEYS.includes(v.k))); updateVitalFlags(box,state.qpt); }
+function updateVitalFlags(root=$('#qvitals'),pt=state.qpt){
+  for(const v of VITALS){ const box=root.querySelector(`[data-vbox="${v.k}"]`); if(!box) continue; let fl=null; const x=num(pt[v.k]);
+    if(v.flag && x!=null) fl=v.flag(x);
+    if(v.k==='gluc' && x!=null){ const g=pt.glucu==='mmol'?x*18:x; fl=g<70?['bad','Hipoglucemia']:g>250?['warn','Hiperglucemia']:null; }
+    box.classList.toggle('flag-bad',!!fl&&fl[0]==='bad'); box.classList.toggle('flag-warn',!!fl&&fl[0]==='warn'); box.querySelector('[data-vflag]').textContent=fl?fl[1]:''; }
+  const f=vitalFlags(pt), c=root.querySelector('[data-vcalc]'); if(c) c.innerHTML = `TAM ${f.tam!=null?fmt(f.tam)+' mmHg':'—'}<br>FG ${f.fg!=null?fmt(f.fg)+' mL/min':'—'}${num(pt.fgman)==null&&f.fg!=null?' <span style="color:var(--ink-soft)">(Cockcroft-Gault)</span>':''}`;
+}
+function onQv(e){ const k=e.target.dataset&&e.target.dataset.qv; if(!k) return; if(e.type==='input'&&e.target.tagName==='SELECT') return; state.qpt[k]=e.target.value; updateVitalFlags($('#qvitals'),state.qpt); renderQuickOut(); }
+document.addEventListener('input',onQv); document.addEventListener('change',onQv);
+
+/* ---------- Consulta rápida ---------- */
+const PER_ML = { mass:{'mg/mL':1,'mcg/mL':0.001,'g/L':1,'mg/L':0.001,'ng/mL':1e-6}, ui:{'UI/mL':1,'UI/L':0.001}, meq:{'mEq/mL':1,'mEq/L':0.001,'mmol/L':0.001} };
+function quickConc(q){ const dim=dimOf(q.drug); if(dim==='vol') return null;
+  if(q.cm==='vol'){ const a=num(q.camt), v=num(q.cvol), f=AMT[dim][q.camu||BASE[dim]]; return (a&&v&&f)? a*f/v : null; }
+  if(q.cm==='pct'){ const p=num(q.cpct); return (p&&dim==='mass')? p*10 : null; }
+  const c=num(q.conc), f=PER_ML[dim][q.cu||Object.keys(PER_ML[dim])[0]]; return (c!=null&&f)? c*f : null; }
+function qSel(i,f,opts,val,rer){ return `<select id="q${i}-${f}" data-qf="${f}"${rer?' data-rerender="1"':''}>${opts.map(([k,l])=>`<option value="${k}"${val===k?' selected':''}>${l}</option>`).join('')}</select>`; }
+function qInp(i,f,val,ph,w){ return `<input id="q${i}-${f}" data-qf="${f}" inputmode="decimal" value="${esc(val)}" placeholder="${ph}" style="width:${w||'5.5em'}">`; }
+function concControls(q,i){
+  if(!q.drug) return '';
+  const dim=dimOf(q.drug); if(dim==='vol') return `<span class="fld">Se administra por volumen; no necesita concentración.</span>`;
+  const modes=[['per','por mL'],['vol','X en Y mL']]; if(dim==='mass') modes.push(['pct','%']);
+  let f='';
+  if(q.cm==='vol') f=`${qInp(i,'camt',q.camt,'250')}${qSel(i,'camu',Object.keys(AMT[dim]).map(u=>[u,u]),q.camu||BASE[dim])}<span class="unit">en</span>${qInp(i,'cvol',q.cvol,'250')}<span class="unit">mL</span>`;
+  else if(q.cm==='pct') f=`${qInp(i,'cpct',q.cpct,'15')}<span class="unit">% p/v</span>`;
+  else f=`${qInp(i,'conc',q.conc,'opcional')}${qSel(i,'cu',Object.keys(PER_ML[dim]).map(u=>[u,u]),q.cu||Object.keys(PER_ML[dim])[0])}`;
+  return `<span class="fld">Concentración (opcional)<span class="dilrow">${qSel(i,'cm',modes,q.cm||'per',true)}${f}</span><span class="unit num" data-qcalc="${i}"></span></span>`;
+}
+function renderQuick(){
+  $('#quick').innerHTML = state.quick.map((q,i)=>`<div class="qslot" data-q="${i}"><span class="row" style="justify-content:space-between"><span class="lab">Fármaco ${i+1}${i>=2?' (opcional)':''}</span>${q.drug?`<button class="iconbtn" type="button" data-qclear="${i}" aria-label="Quitar ${esc(q.drug)}">✕</button>`:''}</span>${comboHTML('q'+i+'-drug',q.drug,'Escriba un fármaco…')}
+    ${q.drug?`<span class="fld">Diluyente${dilControls('q'+i,q,'data-qf')}</span>`:''}
+    ${concControls(q,i)}</div>`).join('')
+    + (state.quick.length<4?`<div class="qslot" style="justify-content:center;align-items:center;border-style:dashed"><button class="btn ghost small" type="button" id="qAdd">+ Otro fármaco</button></div>`:'');
+  renderQuickOut();
+}
+function renderQuickOut(){
+  state.quick.forEach((q,i)=>{ const el=document.querySelector(`[data-qcalc="${i}"]`); if(!el) return; const c=q.drug&&DRUGS[q.drug]?quickConc(q):null; el.textContent = c!=null && q.cm!=='per' ? '= '+concText(q.drug,c) : ''; });
+  const qs=state.quick.filter(q=>q.drug&&DRUGS[q.drug]).map(q=>({drug:q.drug,dil:q.dil,dilp:q.dilp,dilo:q.dilo,conc:quickConc(q)}));
+  if(qs.length<2){ $('#quickOut').innerHTML=`<div class="notice">Elija al menos dos fármacos.</div>`; return; }
+  let st='C'; const rows=[];
+  for(let i=0;i<qs.length;i++) for(let j=i+1;j<qs.length;j++){ const e=evalPair(qs[i],qs[j]); st=worse(st,e.st);
+    rows.push(`<tr><td><strong>${esc(qs[i].drug)}</strong><br>+ <strong>${esc(qs[j].drug)}</strong></td><td>${pill(e.st)}</td><td>${esc(e.msgs.join(' '))}<span class="src" style="display:block;font-size:.78rem;color:var(--ink-soft)">${e.src.length?'Fuente: '+esc(e.src.join(' · ')):''}</span></td></tr>`); }
+  const H={C:'Pueden ir por la misma luz',COND:'Solo si se cumplen las condiciones',I:'No deben ir por la misma luz',ND:'No hay datos suficientes'};
+  const P={C:'Todas las parejas son compatibles en Y según las fuentes.',COND:'Revise las condiciones de diluyente o concentración de cada pareja.',I:'Al menos una pareja es incompatible. Use luces distintas.',ND:'Al menos una pareja no está estudiada. Use luces distintas o consulte a Farmacia.'};
+  const va=[]; for(const q of qs){ const lim=LIMITS[q.drug]; const extra=[...dilCheck(q)];
+    if(lim&&lim.conc&&q.conc!=null&&q.conc>lim.conc*1.0001) extra.push({bad:true,t:`Concentración ${concText(q.drug,q.conc)} superior a la indicada (${lim.txt}).`,s:SRC_UN});
+    for(const a of [...extra,...vitalAlerts(q.drug,state.qpt)]) va.push(`<div class="alert${a.bad?' bad':''}"><strong>${esc(q.drug)}</strong>. ${esc(a.t)}<span class="src">${esc(a.s)}</span></div>`); }
+  const hasV=Object.values(state.qpt).some(v=>v!==''&&v!=null);
+  const red = (st==='I'||st==='COND') ? `<div class="redwarn" role="alert" style="margin-bottom:14px"><strong>⚠ ${st==='I'?'Hay fármacos incompatibles por la misma luz.':'Hay fármacos poco compatibles por la misma luz.'}</strong><p>Revisa las dosis estándares de tu unidad.</p></div>` : '';
+  $('#quickOut').innerHTML = `<div class="verdict v-${st}"><h2>${H[st]}</h2><p>${P[st]}${qs.length>2?' Los estudios valoran parejas; con más de dos fármacos en una luz el riesgo aumenta.':''}</p></div>${red}
+    ${va.length?`<h2 style="font-size:1.15rem;margin:4px 0 8px">Avisos</h2><div class="alerts" style="margin-bottom:14px">${va.join('')}</div>`:hasV?`<div class="notice">Sin avisos con las constantes indicadas.</div>`:''}
+    <div class="tscroll"><table class="pairs-t"><thead><tr><th>Pareja</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+}
+document.addEventListener('input',e=>{ const t=e.target, q=t.closest&&t.closest('[data-q]'); if(q&&t.dataset.qf&&t.tagName!=='SELECT'){ state.quick[+q.dataset.q][t.dataset.qf]=t.value; renderQuickOut(); } });
+document.addEventListener('change',e=>{ const t=e.target, q=t.closest&&t.closest('[data-q]'); if(q&&t.dataset.qf&&t.tagName==='SELECT'){ const o=state.quick[+q.dataset.q]; o[t.dataset.qf]=t.value; if(t.dataset.qf==='dil') o.dilp=''; if(t.dataset.rerender) renderQuick(); else renderQuickOut(); } });
+document.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+  if(b.id==='qAdd'){ state.quick.push(newQ()); renderQuick(); }
+  if(b.dataset.qclear!=null){ const i=+b.dataset.qclear; if(state.quick.length>2) state.quick.splice(i,1); else state.quick[i]=newQ(); renderQuick(); } });
+// al elegir un fármaco en la consulta rápida se actualiza la unidad
+const _pick=pickDrug; pickDrug=function(input,d){ _pick(input,d); if(input.closest('[data-q]')) renderQuick(); };
+
+/* ---------- Fármacos ---------- */
+function renderDrugList(){ const q=norm($('#drugSearch').value||''); const list=q?matches(q):NAMES;
+  $('#druglistItems').innerHTML=list.map(d=>`<button type="button" data-drug="${esc(d)}" aria-current="${d===state.drugSel}">${esc(d)}<small>${DRUGS[d].icu?'UCI':''}${DRUGS[d].u?(DRUGS[d].icu?' · ':'')+'Guía':''}</small></button>`).join(''); }
+function renderMono(){
+  const d=state.drugSel, D=DRUGS[d]; if(!D){ $('#mono').innerHTML=''; return; }
+  const groups={C:[],COND:[],I:[]};
+  for(const o of NAMES){ if(o===d) continue; if(!PAIRS[pkey(d,o)] && !D.nomix && !DRUGS[o].nomix) continue; if(D.nomix||DRUGS[o].nomix){ continue; }
+    const e=evalPair({drug:d,dil:'',conc:null},{drug:o,dil:'',conc:null}); (groups[e.st]||(groups[e.st]=[])).push(o); }
+  const sec=(st,t)=>groups[st]&&groups[st].length?`<div class="tag">${t} (${groups[st].length})</div><div class="partners">${groups[st].map(o=>`<button class="pill st-${st}" type="button" data-drug="${esc(o)}" style="cursor:pointer">${esc(o)}</button>`).join('')}</div>`:'';
+  const u=D.u; const ref=D.ref;
+  $('#mono').innerHTML = `<h2>${esc(d)}</h2>${ALIAS[d]?`<p style="margin:0;color:var(--ink-soft)">También: ${esc(ALIAS[d])}</p>`:''}
+    ${D.nomix?`<div class="alert bad" style="margin-top:10px">La guía indica «No mezclar»: administrar siempre por una luz exclusiva.<span class="src">${SRC_UN}</span></div>`:''}
+    <dl class="dl">
+      ${ref?`<dt>Concentración estándar UCI</dt><dd class="num">${ref[0]!=null?concText(d,ref[0]):esc(ref[1])} <span style="color:var(--ink-soft);font-family:var(--f-body)">(tabla 1, Med Intensiva 2020)</span></dd>`:''}
+      ${u?`<dt>Diluyentes</dt><dd>${esc(u.dil)}</dd><dt>Velocidad de infusión</dt><dd>${esc(u.rate)}</dd><dt>Estabilidad</dt><dd>${esc(u.stab)}</dd><dt>Mezcla en la misma solución</dt><dd>${u.mix==='NO'?'No mezclar':esc(u.mix.join(', '))}</dd>`:''}
+      ${LIMITS[d]?`<dt>Límite indicado en la guía</dt><dd>${esc(LIMITS[d].txt)}</dd>`:''}
+    </dl>
+    ${u?`<p style="font-size:.8rem;color:var(--ink-soft);margin-top:-4px">Diluyentes, velocidad, estabilidad y mezcla: ${SRC_UN}.</p>`:''}
+    <h3 style="font-size:1.1rem;margin-top:14px">Compatibilidad en Y</h3>
+    ${sec('C','Compatible')}${sec('COND','Condicional (diluyente o concentración)')}${sec('I','Incompatible')}
+    ${!D.nomix&&!groups.C.length&&!groups.COND.length&&!groups.I.length?'<p>No hay datos de compatibilidad en Y para este fármaco en las fuentes cargadas.</p>':''}
+    <p style="font-size:.85rem;color:var(--ink-soft)">Cualquier fármaco que no aparezca aquí no tiene datos: no lo administre por la misma luz sin verificarlo.</p>`;
+}
+$('#drugSearch').addEventListener('input',renderDrugList);
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-drug]'); if(b){ state.drugSel=b.dataset.drug; renderDrugList(); renderMono(); $('#mono').scrollIntoView({block:'nearest'}); } });
+
+
+/* ---------- Pie: fuentes y privacidad ---------- */
+document.addEventListener('click',e=>{
+  const gt=e.target.closest('[data-goto]'); if(gt){ goFuentes(gt.dataset.goto); return; }
+  const b=e.target.closest('button'); if(b&&b.id==='backFromFuentes') show(state.prevView||'rapida');
+});
+function goFuentes(where){ if(state.view!=='fuentes') state.prevView=state.view; show('fuentes');
+  if(where==='privacidad'){ const h=document.getElementById('privacidad'); h&&h.scrollIntoView(); } }
+
+/* ---------- Navegación ---------- */
+function show(v){ state.view=v;
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.view===v));
+  document.querySelectorAll('section.view').forEach(s=>s.hidden = s.id!=='view-'+v);
+  if(v==='farmacos'){ renderDrugList(); renderMono(); } if(v==='rapida') renderQuick();
+  window.scrollTo({top:0}); }
+document.querySelector('nav.tabs').addEventListener('click',e=>{ const b=e.target.closest('button[data-view]'); if(b) show(b.dataset.view); });
+
+/* ---------- Arranque ---------- */
+renderQuickVitals(); show('rapida');
+const h=(location.hash||'').slice(1); if(['rapida','farmacos','fuentes'].includes(h)) show(h);
+</script>
+
+</body>
+</html>
