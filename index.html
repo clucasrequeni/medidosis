@@ -206,6 +206,21 @@ table.pairs-t th{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;
 .dilrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .dilrow select,.dilrow input{font-size:.95rem;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--bg);min-height:38px}
 .dilrow input{width:4.5em}
+.lumres{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px;align-items:start}
+.verdict.v-plan{border-color:var(--ink);background:var(--tint);color:var(--ink)}
+.lumcard{border:2px solid var(--ink);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.lumcard.solo{border-color:var(--ink-soft);border-style:dashed}
+.lumcard h3{font-size:1.05rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lumcard .drugs{display:flex;flex-wrap:wrap;gap:6px}
+.lumcard .drug{background:var(--tint);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-weight:700}
+.lumcard .why{font-size:.86rem;color:var(--ink-soft)}
+.lumcard .why strong{color:var(--bad)}
+.resbar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin:4px 0 14px}
+.resbar select{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--bg);min-height:40px}
+details.pairsbox{border:1px solid var(--line);border-radius:var(--r);margin-top:6px}
+details.pairsbox summary{cursor:pointer;padding:12px 14px;font-weight:700;color:var(--accent)}
+details.pairsbox[open] summary{border-bottom:1px solid var(--line)}
+details.pairsbox .tscroll{padding:0 6px 6px}
 .confirm{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.92rem;border:1px solid var(--bad);border-radius:8px;padding:6px 8px;color:var(--bad)}
 /* Inicio: lista de pacientes */
 .addpt{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:2px dashed var(--accent);background:var(--tint);color:var(--accent);border-radius:14px;padding:18px;font-size:1.15rem;font-weight:700;cursor:pointer;margin-bottom:18px}
@@ -271,12 +286,15 @@ footer.foot .linkbtn:hover{color:var(--accent)}
 <main class="wrap">
   <!-- CONSULTA RÁPIDA -->
   <section class="view" id="view-rapida">
-    <div class="pagehead"><div><h1>Consulta rápida</h1><p>Elija de 2 a 4 fármacos para saber si pueden ir por la misma luz del catéter. Indicar el diluyente y la concentración es opcional, pero afina el resultado.</p></div></div>
+    <div class="pagehead"><div><h1>Consulta rápida</h1><p>Añada todos los fármacos que lleva el paciente, sin límite. La app le dice cuántas luces necesita y qué fármacos pueden ir juntos por cada una. Indicar el diluyente y la concentración es opcional, pero afina el resultado.</p></div></div>
     <div class="quick" id="quick"></div>
     <details class="qvit" id="qvitBox">
       <summary>Añadir constantes para esta consulta <span>(opcional)</span></summary>
       <div class="inner"><p style="margin:0 0 10px;color:var(--ink-soft)">Si las indica, el resultado incluirá avisos según la situación del paciente. No se guardan en ningún sitio.</p><div class="vitals" id="qvitals"></div></div>
     </details>
+    <div class="resbar"><h2 style="font-size:1.3rem">Resultado</h2>
+      <label class="fld" style="flex-direction:row;align-items:center;gap:8px;font-size:.92rem">Máximo de fármacos por luz
+        <select id="maxPer"><option value="0" selected>Sin límite</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label></div>
     <div id="quickOut"></div>
   </section>
 
@@ -314,7 +332,8 @@ footer.foot .linkbtn:hover{color:var(--accent)}
       <li><strong>Condicional</strong> cuando la compatibilidad depende del diluyente (solo en glucosado 5% o solo en suero fisiológico) o de no superar una concentración máxima (tabla 2 del artículo). Si se indican el diluyente y la concentración, la app comprueba la condición y la da por cumplida o no.</li>
       <li>Si las fuentes discrepan, prevalece la más restrictiva y se muestran ambas.</li>
       <li>Los datos del artículo se estudiaron a las concentraciones estándar de su tabla 1. Si la concentración introducida es mayor, el resultado pasa a condicional: según los autores, no se puede extrapolar.</li>
-      <li>Los estudios analizan parejas de fármacos. Con tres o más fármacos en una luz se comprueban todas las parejas, pero los autores desaconsejan juntar más de dos.</li>
+      <li>Los estudios analizan parejas de fármacos. Con tres o más fármacos en una luz se comprueban todas las parejas, pero los autores desaconsejan juntar más de dos. Puede limitar el número de fármacos por luz con «Máximo de fármacos por luz».</li>
+      <li><strong>Distribución por luces:</strong> la app reparte los fármacos en el menor número de luces posible. Dos fármacos solo comparten luz si su pareja es «Compatible» (o «Condicional» con la condición cumplida). Las parejas incompatibles, sin datos o con condiciones sin confirmar van por luces distintas.</li>
       <li><strong>Sin datos</strong>: ninguna de las dos fuentes estudió esa pareja. Trátela como no compatible hasta confirmarlo.</li>
     </ul>
     <h2>Fuentes revisadas que no se han podido incorporar</h2>
@@ -623,34 +642,63 @@ function concControls(q,i){
   return `<span class="fld">Concentración (opcional)<span class="dilrow">${qSel(i,'cm',modes,q.cm||'per',true)}${f}</span><span class="unit num" data-qcalc="${i}"></span></span>`;
 }
 function renderQuick(){
-  $('#quick').innerHTML = state.quick.map((q,i)=>`<div class="qslot" data-q="${i}"><span class="row" style="justify-content:space-between"><span class="lab">Fármaco ${i+1}${i>=2?' (opcional)':''}</span>${q.drug?`<button class="iconbtn" type="button" data-qclear="${i}" aria-label="Quitar ${esc(q.drug)}">✕</button>`:''}</span>${comboHTML('q'+i+'-drug',q.drug,'Escriba un fármaco…')}
+  $('#quick').innerHTML = state.quick.map((q,i)=>`<div class="qslot" data-q="${i}"><span class="row" style="justify-content:space-between"><span class="lab">Fármaco ${i+1}</span>${q.drug?`<button class="iconbtn" type="button" data-qclear="${i}" aria-label="Quitar ${esc(q.drug)}">✕</button>`:''}</span>${comboHTML('q'+i+'-drug',q.drug,'Escriba un fármaco…')}
     ${q.drug?`<span class="fld">Diluyente${dilControls('q'+i,q,'data-qf')}</span>`:''}
     ${concControls(q,i)}</div>`).join('')
-    + (state.quick.length<4?`<div class="qslot" style="justify-content:center;align-items:center;border-style:dashed"><button class="btn ghost small" type="button" id="qAdd">+ Otro fármaco</button></div>`:'');
+    + `<div class="qslot" style="justify-content:center;align-items:center;border-style:dashed;min-height:140px"><button class="btn" type="button" id="qAdd">+ Añadir fármaco</button></div>`;
   renderQuickOut();
+}
+/* Reparte los fármacos en el menor número de luces: dos fármacos solo comparten luz si su pareja es «Compatible». */
+function groupLumens(n, ok, maxPer){
+  const conf=i=>{ let c=0; for(let j=0;j<n;j++) if(j!==i&&!ok[i][j]) c++; return c; };
+  const order=[...Array(n).keys()].sort((x,y)=>conf(y)-conf(x));
+  const fits=(g,x)=>(!maxPer||g.length<maxPer)&&g.every(y=>ok[x][y]);
+  let best=[]; for(const x of order){ const g=best.find(g=>fits(g,x)); if(g) g.push(x); else best.push([x]); }
+  best=best.map(g=>g.slice());
+  let steps=0; const groups=[];
+  (function bt(k){ if(++steps>200000) return; if(groups.length>=best.length) return;
+    if(k===n){ best=groups.map(g=>g.slice()); return; }
+    const x=order[k];
+    for(const g of groups){ if(fits(g,x)){ g.push(x); bt(k+1); g.pop(); } }
+    groups.push([x]); bt(k+1); groups.pop(); })(0);
+  return best.map(g=>g.sort((p,q)=>p-q)).sort((p,q)=>q.length-p.length||p[0]-q[0]);
 }
 function renderQuickOut(){
   state.quick.forEach((q,i)=>{ const el=document.querySelector(`[data-qcalc="${i}"]`); if(!el) return; const c=q.drug&&DRUGS[q.drug]?quickConc(q):null; el.textContent = c!=null && q.cm!=='per' ? '= '+concText(q.drug,c) : ''; });
   const qs=state.quick.filter(q=>q.drug&&DRUGS[q.drug]).map(q=>({drug:q.drug,dil:q.dil,dilp:q.dilp,dilo:q.dilo,conc:quickConc(q)}));
-  if(qs.length<2){ $('#quickOut').innerHTML=`<div class="notice">Elija al menos dos fármacos.</div>`; return; }
-  let st='C'; const rows=[];
-  for(let i=0;i<qs.length;i++) for(let j=i+1;j<qs.length;j++){ const e=evalPair(qs[i],qs[j]); st=worse(st,e.st);
-    rows.push(`<tr><td><strong>${esc(qs[i].drug)}</strong><br>+ <strong>${esc(qs[j].drug)}</strong></td><td>${pill(e.st)}</td><td>${esc(e.msgs.join(' '))}<span class="src" style="display:block;font-size:.78rem;color:var(--ink-soft)">${e.src.length?'Fuente: '+esc(e.src.join(' · ')):''}</span></td></tr>`); }
-  const H={C:'Pueden ir por la misma luz',COND:'Solo si se cumplen las condiciones',I:'No deben ir por la misma luz',ND:'No hay datos suficientes'};
-  const P={C:'Todas las parejas son compatibles en Y según las fuentes.',COND:'Revise las condiciones de diluyente o concentración de cada pareja.',I:'Al menos una pareja es incompatible. Use luces distintas.',ND:'Al menos una pareja no está estudiada. Use luces distintas o consulte a Farmacia.'};
+  if(qs.length<2){ $('#quickOut').innerHTML=`<div class="notice">Añada al menos dos fármacos.</div>`; return; }
+  const n=qs.length, ok=Array.from({length:n},()=>Array(n).fill(true)), E={}; let st='C'; const rows=[];
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){ const e=evalPair(qs[i],qs[j]); E[i+'|'+j]=E[j+'|'+i]=e; ok[i][j]=ok[j][i]=(e.st==='C'); st=worse(st,e.st);
+    rows.push({o:ORDER[e.st],h:`<tr><td><strong>${esc(qs[i].drug)}</strong><br>+ <strong>${esc(qs[j].drug)}</strong></td><td>${pill(e.st)}</td><td>${esc(e.msgs.join(' '))}<span class="src" style="display:block;font-size:.78rem;color:var(--ink-soft)">${e.src.length?'Fuente: '+esc(e.src.join(' · ')):''}</span></td></tr>`}); }
+  rows.sort((x,y)=>y.o-x.o);
+  const maxPer=+($('#maxPer')?.value||0);
+  const G=groupLumens(n,ok,maxPer);
+  const why=(i)=>{ const L={I:'incompatible',COND:'solo con condiciones',ND:'sin datos'}; const bits=[];
+    for(let j=0;j<n;j++){ if(j===i) continue; const e=E[i+'|'+j]; if(e.st!=='C') bits.push(`${esc(qs[j].drug)} (<strong>${L[e.st]||''}</strong>)`); }
+    return bits.length? `No puede compartir luz con: ${bits.join(', ')}.` : (maxPer?'Separado por el máximo de fármacos por luz elegido.':''); };
+  const cards=G.map((g,k)=>`<div class="lumcard${g.length===1?' solo':''}"><h3>Luz ${k+1} ${g.length>1?pill('C',`${g.length} fármacos compatibles`):'<span class="pill st-NONE">Solo</span>'}</h3>
+    <div class="drugs">${g.map(i=>`<span class="drug">${esc(qs[i].drug)}</span>`).join('')}</div>
+    ${g.length===1&&n>1?`<span class="why">${why(g[0])}</span>`:''}
+    ${g.length>=3?`<span class="why">Todas las parejas de esta luz son compatibles, pero los estudios valoran parejas: con 3 o más fármacos vigile la vía.</span>`:''}</div>`).join('');
+  const one=G.length===1;
+  const head = one
+    ? `<div class="verdict v-C"><h2>Los ${n} fármacos pueden ir por la misma luz</h2><p>Todas las parejas son compatibles en Y según las fuentes.${n>2?' Los estudios valoran parejas; con 3 o más fármacos en una luz vigile la vía.':''}</p></div>`
+    : `<div class="verdict v-plan"><h2>Se necesitan ${G.length} luces</h2><p>Hay fármacos que no pueden ir juntos. Esta es la distribución con menos luces según las fuentes: dos fármacos solo comparten luz si su pareja es compatible.</p></div>`;
   const va=[]; for(const q of qs){ const lim=LIMITS[q.drug]; const extra=[...dilCheck(q)];
     if(lim&&lim.conc&&q.conc!=null&&q.conc>lim.conc*1.0001) extra.push({bad:true,t:`Concentración ${concText(q.drug,q.conc)} superior a la indicada (${lim.txt}).`,s:SRC_UN});
     for(const a of [...extra,...vitalAlerts(q.drug,state.qpt)]) va.push(`<div class="alert${a.bad?' bad':''}"><strong>${esc(q.drug)}</strong>. ${esc(a.t)}<span class="src">${esc(a.s)}</span></div>`); }
   const hasV=Object.values(state.qpt).some(v=>v!==''&&v!=null);
-  const red = (st==='I'||st==='COND') ? `<div class="redwarn" role="alert" style="margin-bottom:14px"><strong>⚠ ${st==='I'?'Hay fármacos incompatibles por la misma luz.':'Hay fármacos poco compatibles por la misma luz.'}</strong><p>Revisa las dosis estándares de tu unidad.</p></div>` : '';
-  $('#quickOut').innerHTML = `<div class="verdict v-${st}"><h2>${H[st]}</h2><p>${P[st]}${qs.length>2?' Los estudios valoran parejas; con más de dos fármacos en una luz el riesgo aumenta.':''}</p></div>${red}
-    ${va.length?`<h2 style="font-size:1.15rem;margin:4px 0 8px">Avisos</h2><div class="alerts" style="margin-bottom:14px">${va.join('')}</div>`:hasV?`<div class="notice">Sin avisos con las constantes indicadas.</div>`:''}
-    <div class="tscroll"><table class="pairs-t"><thead><tr><th>Pareja</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  const nBad=rows.filter(r=>r.o>=ORDER.COND&&r.o!==ORDER.ND).length;
+  const red = (st==='I'||st==='COND'||nBad) ? `<div class="redwarn" role="alert" style="margin-bottom:14px"><strong>⚠ Hay fármacos incompatibles o poco compatibles entre sí: no los ponga por la misma luz.</strong><p>Revisa las dosis estándares de tu unidad.</p></div>` : '';
+  $('#quickOut').innerHTML = head + red + `<div class="lumres">${cards}</div>`
+    + (va.length?`<h2 style="font-size:1.15rem;margin:4px 0 8px">Avisos</h2><div class="alerts" style="margin-bottom:14px">${va.join('')}</div>`:hasV?`<div class="notice">Sin avisos con las constantes indicadas.</div>`:'')
+    + `<details class="pairsbox"${n<=3?' open':''}><summary>Ver el detalle de las ${rows.length} parejas</summary><div class="tscroll"><table class="pairs-t"><thead><tr><th>Pareja</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody>${rows.map(r=>r.h).join('')}</tbody></table></div></details>`;
 }
+document.addEventListener('change',e=>{ if(e.target.id==='maxPer') renderQuickOut(); });
 document.addEventListener('input',e=>{ const t=e.target, q=t.closest&&t.closest('[data-q]'); if(q&&t.dataset.qf&&t.tagName!=='SELECT'){ state.quick[+q.dataset.q][t.dataset.qf]=t.value; renderQuickOut(); } });
 document.addEventListener('change',e=>{ const t=e.target, q=t.closest&&t.closest('[data-q]'); if(q&&t.dataset.qf&&t.tagName==='SELECT'){ const o=state.quick[+q.dataset.q]; o[t.dataset.qf]=t.value; if(t.dataset.qf==='dil') o.dilp=''; if(t.dataset.rerender) renderQuick(); else renderQuickOut(); } });
 document.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
-  if(b.id==='qAdd'){ state.quick.push(newQ()); renderQuick(); }
+  if(b.id==='qAdd'){ state.quick.push(newQ()); renderQuick(); const n=document.getElementById('q'+(state.quick.length-1)+'-drug'); n&&n.focus(); }
   if(b.dataset.qclear!=null){ const i=+b.dataset.qclear; if(state.quick.length>2) state.quick.splice(i,1); else state.quick[i]=newQ(); renderQuick(); } });
 // al elegir un fármaco en la consulta rápida se actualiza la unidad
 const _pick=pickDrug; pickDrug=function(input,d){ _pick(input,d); if(input.closest('[data-q]')) renderQuick(); };
