@@ -5,6 +5,8 @@ Herramienta web para consultar la compatibilidad de fármacos intravenosos admin
 - **Consulta rápida**: añada todos los fármacos del paciente (sin límite), con diluyente y concentración opcionales. La app calcula cuántas luces hacen falta y qué fármacos pueden ir juntos por cada una. Puede añadir constantes del paciente para recibir avisos.
 - **Fármacos**: ficha de cada fármaco con diluyentes, velocidad de infusión, estabilidad y compatibilidades en Y.
 
+- **Tabla compatibilidad** (enlace al pie): matriz de colores de 44 fármacos de UCI con leyenda, concentraciones máximas compatibles (tabla 2) y concentraciones estándar de referencia (tabla 1).
+
 Toda la app está en `index.html`. No usa servidor ni guarda datos: lo que se escribe desaparece al cerrar la página.
 
 ## Fuentes
