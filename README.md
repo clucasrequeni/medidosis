@@ -15,6 +15,8 @@ Toda la app está en `index.html`. No usa servidor ni guarda datos: lo que se es
 - Espinosa Franco B et al. Guía de compatibilidades de fármacos en vía parenteral para un hospital de segundo nivel. UNAM FES Zaragoza, 2010.
 - Marsilio NR et al. Incompatibilidades medicamentosas en una UCI de adultos de un hospital universitario (clasificación Micromedex). *Rev Bras Ter Intensiva.* 2016;28(2):147-53.
 
+- Vasopresina (argipresina)*, añadida fuera de la tabla original: ficha técnica de Empressin (CIMA, AEMPS); IUCPQ, *Guide d'administration intraveineuse des médicaments critiques*, 16.ª ed., 2025; ANMF Consensus Group, Argipressin v2.0, 2021 (Micromedex y Australian Injectable Drugs Handbook); Trissel 25.ª ed.; Ramaley et al. *Int J Pharm Compd.* 2014.
+
 ## Aviso
 
 Herramienta de apoyo. No sustituye el juicio clínico ni la consulta con Farmacia. Una combinación sin datos no significa que sea compatible.
